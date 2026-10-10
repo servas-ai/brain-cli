@@ -18,6 +18,9 @@ Vorgebaute Binaries: https://github.com/servas-ai/brain-cli/releases/latest (`br
 
 ## Befehle
 
+- `brain update-check` – prüft, ob es neuere Versionen von Framework (`BRAIN_VERSION` im Brain) und Tools gibt; `brain sync` macht das automatisch höchstens einmal am Tag und schreibt Hinweise in `_perspektive.md` (abschalten: `--no-update-check` oder `BRAIN_NO_UPDATE_CHECK=1`).
+
+
 | Befehl | Was |
 | --- | --- |
 | `brain sync [--root <dir>] [--no-katalog] [--perspektive <md>] [--no-pull]` | `git pull --ff-only` im Root und in jeder Zelle (`workspaces/*/`, `personal/`; Fehler nur Warnung), dann `_kinder.md`, `_workspaces.md`, `_katalog/`, `_perspektive.md` neu erzeugen |

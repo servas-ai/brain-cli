@@ -17,6 +17,7 @@ Aufruf:
   brain clone-cell <git-url> [--name <slug>] [--root <dir>]
   brain check [--root <dir>]
   brain doctor [--root <dir>]
+  brain update-check     neuere Versionen von Framework und Tools auf GitHub prüfen
   brain version
   brain --help
 
@@ -39,6 +40,8 @@ func main() {
 		code = cmdCheck(args)
 	case "doctor":
 		code = cmdDoctor(args)
+	case "update-check":
+		os.Exit(cmdUpdateCheck(os.Args[2:]))
 	case "version", "--version", "-v":
 		fmt.Println("brain " + version)
 	case "help", "--help", "-h":

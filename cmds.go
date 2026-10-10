@@ -52,6 +52,7 @@ func cmdSync(args []string) int {
 	noKat := fs.Bool("no-katalog", false, "keinen _katalog/ erzeugen (vorhandenen löschen)")
 	persp := fs.String("perspektive", "", "Markdown-Datei mit Angaben zu Logins")
 	noPull := fs.Bool("no-pull", false, "kein git pull")
+	noUpd := fs.Bool("no-update-check", false, "nicht nach neuen Versionen suchen")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -88,6 +89,13 @@ func cmdSync(args []string) int {
 	}
 	if err == nil {
 		err = writePerspektive(r, *persp)
+	}
+	if err == nil && !*noUpd {
+		notices := updateNotices(r, false)
+		appendUpdatesToPerspektive(r, notices)
+		for _, n := range notices {
+			fmt.Println("brain sync: Update verfügbar: " + n)
+		}
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "brain:", err)
