@@ -2,6 +2,20 @@
 
 CLI für das Firmen-Brain (Landkarte + Zellen). Eine Datei, keine Abhängigkeiten, läuft auf Windows, macOS und Linux.
 
+## Voraussetzungen
+
+| Was | Wofür |
+| --- | --- |
+| Git ≥ 2.40 (Windows: Git für Windows inkl. Git Bash) | `sync` (pull) und `clone-cell` (Sparse-Checkout) |
+| GitHub CLI `gh` (empfohlen) | Workspaces finden und Repos klonen, siehe Setup im brain-Repo |
+| optional `qdrantcli`, `sharepointcli` im PATH | `sync` schreibt deren Sicht in `_perspektive.md` |
+
+Betriebssysteme: Windows 10/11, macOS 12+, Linux (amd64/arm64). Keine weiteren Laufzeitabhängigkeiten (ein einzelnes Go-Programm).
+
+## Installation
+
+Vorgebaute Binaries: https://github.com/servas-ai/brain-cli/releases/latest (`brain_<os>_<arch>.zip` bzw. `.tar.gz`, Prüfsummen in `SHA256SUMS`). In einen Ordner im `PATH` legen; die vollständige Anleitung steht im brain-Repo: https://github.com/servas-ai/brain#setup-für-die-harness
+
 ## Befehle
 
 | Befehl | Was |
