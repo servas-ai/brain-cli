@@ -2,7 +2,7 @@
 # Cross-Compile: dist/brain_<version>_<os>_<arch>.(zip|tar.gz) + dist/SHA256SUMS
 set -euo pipefail
 cd "$(dirname "$0")"
-VERSION="${VERSION:-0.1.1}"
+VERSION="${VERSION:-0.1.2}"
 TARGETS="windows/amd64 windows/arm64 darwin/amd64 darwin/arm64 linux/amd64 linux/arm64"
 rm -rf dist && mkdir -p dist
 for t in $TARGETS; do

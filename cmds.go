@@ -53,6 +53,7 @@ func cmdSync(args []string) int {
 	persp := fs.String("perspektive", "", "Markdown-Datei mit Angaben zu Logins")
 	noPull := fs.Bool("no-pull", false, "kein git pull")
 	noUpd := fs.Bool("no-update-check", false, "nicht nach neuen Versionen suchen")
+	noDisc := fs.Bool("no-discover", false, "keine neuen Workspaces suchen")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -66,6 +67,9 @@ func cmdSync(args []string) int {
 			fmt.Fprintln(os.Stderr, "brain: Warnung: git nicht gefunden, überspringe pull")
 		} else {
 			gitPull(r, ".")
+			if !*noDisc {
+				reportDiscovery(discoverCells(r))
+			}
 			for _, n := range listNames(filepath.Join(r, "workspaces")) {
 				gitPull(filepath.Join(r, "workspaces", n), "workspaces/"+n)
 			}

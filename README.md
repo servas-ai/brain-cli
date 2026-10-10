@@ -18,6 +18,10 @@ Vorgebaute Binaries: https://github.com/servas-ai/brain-cli/releases/latest (`br
 
 ## Befehle
 
+- `brain hook stop` – Stop-Hook für Claude Code/Codex: blockiert das Beenden einmal (höchstens stündlich), wenn die Sitzung recherchiert oder länger gearbeitet, aber nichts ins Brain geschrieben hat. `brain hook compact` – Erinnerung nach einer Zusammenfassung.
+- `brain sync` findet über `gh` neue Workspaces (Topic `brain-cell`) und hängt sie ein (`--no-discover` schaltet das ab).
+
+
 - `brain update-check` – prüft, ob es neuere Versionen von Framework (`BRAIN_VERSION` im Brain) und Tools gibt; `brain sync` macht das automatisch höchstens einmal am Tag und schreibt Hinweise in `_perspektive.md` (abschalten: `--no-update-check` oder `BRAIN_NO_UPDATE_CHECK=1`).
 
 
