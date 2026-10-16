@@ -1111,6 +1111,13 @@ func ingNachweisFehler(dir string, n int) []string {
 			errs = append(errs, fmt.Sprintf("Stapel %s, %s: %d Wissenspunkte im Befund, %d im Übernahme-Nachweis", nn, datei, k, zeilen[datei]))
 		}
 	}
+	if root, err := findRoot(""); err == nil && isFile(filepath.Join(root, "AGENTS.md")) {
+		for _, m := range regexp.MustCompile("→\\s*`([a-z0-9][a-z0-9._-]*)`").FindAllStringSubmatch(string(ueb), -1) {
+			if !isFile(filepath.Join(root, ingIDPfad(m[1]), "README.md")) {
+				errs = append(errs, fmt.Sprintf("Stapel %s: Knoten `%s` aus dem Übernahme-Nachweis gibt es im Brain nicht", nn, m[1]))
+			}
+		}
+	}
 	pr, err := os.ReadFile(filepath.Join(dir, "pruefung", nn+".md"))
 	if err != nil {
 		errs = append(errs, "Stapel "+nn+": keine Lückenprüfung (pruefung/"+nn+".md)")
@@ -1118,4 +1125,13 @@ func ingNachweisFehler(dir string, n int) []string {
 		errs = append(errs, "Stapel "+nn+": Lückenprüfung nicht abgeschlossen (Zeile \"Ergebnis: vollständig\" oder \"Ergebnis: alle Lücken geschlossen\" fehlt)")
 	}
 	return errs
+}
+
+// ingIDPfad bildet eine Knoten-id auf ihren Ordner ab (workspace.<slug>.x → workspaces/<slug>/x).
+func ingIDPfad(id string) string {
+	parts := strings.Split(id, ".")
+	if parts[0] == "workspace" && len(parts) > 1 {
+		parts = append([]string{"workspaces"}, parts[1:]...)
+	}
+	return filepath.Join(parts...)
 }
