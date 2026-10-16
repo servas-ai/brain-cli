@@ -17,6 +17,7 @@ Aufruf:
   brain clone-cell <git-url> [--name <slug>] [--root <dir>]
   brain check [--root <dir>]
   brain doctor [--root <dir>]
+  brain ingest <ordner>|status|done  Ordner als Wissen ins Brain aufnehmen (siehe public.brain.ingest)
   brain hook stop|compact Hook für Harnesses: Pflicht, Wissen ins Brain zu schreiben
   brain update-check     neuere Versionen von Framework und Tools auf GitHub prüfen
   brain version
@@ -41,6 +42,8 @@ func main() {
 		code = cmdCheck(args)
 	case "doctor":
 		code = cmdDoctor(args)
+	case "ingest":
+		code = cmdIngest(args)
 	case "hook":
 		os.Exit(cmdHook(os.Args[2:]))
 	case "update-check":

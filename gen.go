@@ -16,7 +16,7 @@ var (
 	h1Re      = regexp.MustCompile(`(?m)^# (.+)$`)
 	projNrRe  = regexp.MustCompile(`^\d{2}-\d{3}$`)
 	normRe    = regexp.MustCompile(`(?i)^(DIN|VDI|VDE|EN|ISO|DVGW|TRGS|GEG|AMEV|ArbStättV|MLAR|MLüAR|HOAI)\b`)
-	skipDirs  = map[string]bool{".git": true, ".claude": true, ".codex": true, "templates": true, "proto": true, "_katalog": true}
+	skipDirs  = map[string]bool{".git": true, ".claude": true, ".codex": true, ".agents": true, "templates": true, "proto": true, "_katalog": true}
 	katalogMx = 150
 )
 

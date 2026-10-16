@@ -154,7 +154,7 @@ func cmdCloneCell(args []string) int {
 	}
 	steps := [][]string{
 		{"clone", "--no-checkout", url, target},
-		{"-C", target, "sparse-checkout", "set", "--no-cone", "/*", "!AGENTS.md", "!CLAUDE.md", "!.claude/", "!.codex/", "!**/AGENTS.md", "!**/CLAUDE.md"},
+		{"-C", target, "sparse-checkout", "set", "--no-cone", "/*", "!AGENTS.md", "!CLAUDE.md", "!.claude/", "!.codex/", "!.agents/", "!**/AGENTS.md", "!**/CLAUDE.md"},
 		{"-C", target, "checkout"},
 	}
 	for _, s := range steps {
@@ -163,7 +163,7 @@ func cmdCloneCell(args []string) int {
 			return 1
 		}
 	}
-	fmt.Printf("brain: Zelle geklont nach workspaces/%s (ohne AGENTS.md, CLAUDE.md, .claude/, .codex/). Danach: brain sync\n", slug)
+	fmt.Printf("brain: Zelle geklont nach workspaces/%s (ohne AGENTS.md, CLAUDE.md, .claude/, .codex/, .agents/). Danach: brain sync\n", slug)
 	return 0
 }
 
@@ -215,7 +215,7 @@ func cmdCheck(args []string) int {
 	if isDir(filepath.Join(r, "personal")) {
 		cells = append(cells, filepath.Join(r, "personal"))
 	}
-	forbidden := map[string]bool{"AGENTS.md": true, "CLAUDE.md": true, ".claude": true, ".codex": true}
+	forbidden := map[string]bool{"AGENTS.md": true, "CLAUDE.md": true, ".claude": true, ".codex": true, ".agents": true}
 	for _, c := range cells {
 		filepath.WalkDir(c, func(p string, d os.DirEntry, err error) error {
 			if err != nil {
