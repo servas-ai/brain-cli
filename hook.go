@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// brain hook stop|compact – Hooks für Harnesses (Claude Code: Stop / SessionStart "compact").
+// brain hook stop|compact – Hooks für Harnesses (Claude Code / Codex / Grok CLI: Stop; Claude Code: SessionStart "compact").
 //
 // stop: Hat die Sitzung seit der letzten Prüfung recherchiert oder viel gearbeitet, aber nichts
 // ins Brain geschrieben, blockiert der Hook das Beenden einmal und verlangt den Abschluss nach
@@ -117,6 +117,8 @@ func hookStop() int {
 }
 
 // scanTranscript zählt ab Zeile `from` Recherche-Aufrufe, Arbeitsschritte und Schreibzugriffe ins Brain.
+// Versteht das Transcript von Claude Code (type "assistant" mit tool_use) und von Grok CLI
+// (updates.jsonl, session/update mit sessionUpdate "tool_call").
 func scanTranscript(path string, from int, root string) (research, work, writes, lines int) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -126,6 +128,14 @@ func scanTranscript(path string, from int, root string) (research, work, writes,
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 64<<20)
 	rootSlash := filepath.ToSlash(root)
+	count := func(name string, raw json.RawMessage) {
+		work++
+		var in map[string]interface{}
+		json.Unmarshal(raw, &in)
+		r, w := classifyTool(name, in, rootSlash)
+		research += r
+		writes += w
+	}
 	for sc.Scan() {
 		lines++
 		if lines <= from {
@@ -136,8 +146,31 @@ func scanTranscript(path string, from int, root string) (research, work, writes,
 			Message struct {
 				Content json.RawMessage `json:"content"`
 			} `json:"message"`
+			Params struct {
+				Update struct {
+					SessionUpdate string          `json:"sessionUpdate"`
+					Title         string          `json:"title"`
+					RawInput      json.RawMessage `json:"rawInput"`
+					Meta          struct {
+						Tool struct {
+							Name string `json:"name"`
+						} `json:"x.ai/tool"`
+					} `json:"_meta"`
+				} `json:"update"`
+			} `json:"params"`
 		}
-		if json.Unmarshal(sc.Bytes(), &e) != nil || e.Type != "assistant" {
+		if json.Unmarshal(sc.Bytes(), &e) != nil {
+			continue
+		}
+		if u := e.Params.Update; u.SessionUpdate == "tool_call" {
+			name := u.Meta.Tool.Name
+			if name == "" {
+				name = u.Title
+			}
+			count(grokToolName(name, u.RawInput), u.RawInput)
+			continue
+		}
+		if e.Type != "assistant" {
 			continue
 		}
 		var parts []struct {
@@ -149,34 +182,60 @@ func scanTranscript(path string, from int, root string) (research, work, writes,
 			continue
 		}
 		for _, p := range parts {
-			if p.Type != "tool_use" {
-				continue
+			if p.Type == "tool_use" {
+				count(p.Name, p.Input)
 			}
-			work++
-			var in map[string]interface{}
-			json.Unmarshal(p.Input, &in)
-			fp, _ := in["file_path"].(string)
-			cmd, _ := in["command"].(string)
-			fpSlash := filepath.ToSlash(fp)
-			switch {
-			case p.Name == "Write" || p.Name == "Edit" || p.Name == "NotebookEdit":
-				if rootSlash != "" && strings.HasPrefix(fpSlash, rootSlash) {
-					writes++
-				}
-			case p.Name == "WebFetch" || p.Name == "WebSearch" || strings.HasPrefix(p.Name, "mcp__"):
-				research++
-			case p.Name == "Bash" || p.Name == "PowerShell":
-				if strings.Contains(cmd, "qdrantcli") || strings.Contains(cmd, "sharepointcli") || strings.Contains(cmd, "curl ") {
-					research++
-				}
-				if strings.Contains(cmd, "git commit") || strings.Contains(cmd, "> personal/") || strings.Contains(cmd, "personal/fundstellen") && strings.Contains(cmd, ">") {
-					writes++
-				}
-			case p.Name == "Read":
-				if rootSlash != "" && fp != "" && !strings.HasPrefix(fpSlash, rootSlash) {
-					research++
-				}
-			}
+		}
+	}
+	return
+}
+
+// grokToolName bildet Grok-CLI-Werkzeuge auf die Claude-Namen ab, die classifyTool kennt.
+func grokToolName(name string, raw json.RawMessage) string {
+	var in struct {
+		Variant string `json:"variant"`
+	}
+	json.Unmarshal(raw, &in)
+	switch {
+	case name == "run_terminal_command":
+		return "Bash"
+	case name == "write" || name == "search_replace" || name == "hashline_edit" || name == "multi_edit" || name == "edit_notebook":
+		return "Write"
+	case name == "read_file":
+		return "Read"
+	case name == "web_search" || name == "web_fetch" || in.Variant == "WebSearch" || in.Variant == "WebFetch":
+		return "WebSearch"
+	case strings.Contains(name, "__"):
+		return "mcp__" + name
+	}
+	return name
+}
+
+// classifyTool liefert (Recherche, Schreibzugriff ins Brain) für einen Werkzeugaufruf.
+func classifyTool(name string, in map[string]interface{}, rootSlash string) (research, writes int) {
+	fp, _ := in["file_path"].(string)
+	if fp == "" {
+		fp, _ = in["target_file"].(string)
+	}
+	cmd, _ := in["command"].(string)
+	fpSlash := filepath.ToSlash(fp)
+	switch {
+	case name == "Write" || name == "Edit" || name == "NotebookEdit":
+		if rootSlash != "" && strings.HasPrefix(fpSlash, rootSlash) {
+			writes++
+		}
+	case name == "WebFetch" || name == "WebSearch" || strings.HasPrefix(name, "mcp__"):
+		research++
+	case name == "Bash" || name == "PowerShell":
+		if strings.Contains(cmd, "qdrantcli") || strings.Contains(cmd, "sharepointcli") || strings.Contains(cmd, "curl ") {
+			research++
+		}
+		if strings.Contains(cmd, "git commit") || strings.Contains(cmd, "> personal/") || strings.Contains(cmd, "personal/fundstellen") && strings.Contains(cmd, ">") {
+			writes++
+		}
+	case name == "Read":
+		if rootSlash != "" && fp != "" && !strings.HasPrefix(fpSlash, rootSlash) {
+			research++
 		}
 	}
 	return
