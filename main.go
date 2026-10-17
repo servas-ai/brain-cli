@@ -19,10 +19,12 @@ Aufruf:
   brain doctor [--root <dir>]
   brain hook stop|compact Hook für Harnesses: Pflicht, Wissen ins Brain zu schreiben
   brain update-check     neuere Versionen von Framework und Tools auf GitHub prüfen
+  brain login [--url <forge-url>] [--no-open]   Token für das Forge-Brain hinterlegen (stdin)
   brain version
   brain --help
 
 Root-Default: aktuelles Verzeichnis, nach oben bis eine AGENTS.md gefunden wird.
+Forge-Brain: <root>/.brain/forge.yml (typ: forgejo, url, org) statt GitHub.
 `
 
 func main() {
@@ -43,6 +45,8 @@ func main() {
 		code = cmdDoctor(args)
 	case "hook":
 		os.Exit(cmdHook(os.Args[2:]))
+	case "login":
+		code = cmdLogin(args)
 	case "update-check":
 		os.Exit(cmdUpdateCheck(os.Args[2:]))
 	case "version", "--version", "-v":
