@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -10,26 +11,22 @@ import (
 // discoverCells findet über die GitHub CLI alle Repos der Organisation des Brain-Repos mit dem
 // Topic brain-cell, die der Login lesen darf, und klont fehlende nach workspaces/<name>.
 // Zellen, die lokal liegen, aber nicht mehr gelistet werden, werden nur gemeldet (nie gelöscht).
+//
+// Liegt .brain/forge.yml im Root (Forge-Brain, siehe forge.go), kommt die Liste stattdessen aus der
+// Forgejo-API; gh wird dann nicht gebraucht.
 func discoverCells(root string) (added, gone []string) {
-	gh, err := exec.LookPath("gh")
-	if err != nil {
-		return nil, nil
-	}
-	url, err := runTimeout(10, "git", "-C", root, "remote", "get-url", "origin")
-	if err != nil {
-		return nil, nil
-	}
-	org := orgFromURL(strings.TrimSpace(url))
-	if org == "" {
-		return nil, nil
-	}
-	out, err := runTimeout(30, gh, "api", "--paginate", "orgs/"+org+"/repos?per_page=100",
-		"--jq", `.[] | select((.topics // []) | index("brain-cell")) | .name + " " + .clone_url`)
-	if err != nil {
-		// privater Account statt Organisation
-		out, err = runTimeout(30, gh, "api", "--paginate", "user/repos?per_page=100&affiliation=owner,collaborator,organization_member",
-			"--jq", `.[] | select(.owner.login == "`+org+`") | select((.topics // []) | index("brain-cell")) | .name + " " + .clone_url`)
+	var out string
+	if fc, err := readForge(root); err != nil || fc != nil {
+		if err == nil {
+			out, err = forgeCellLines(fc)
+		}
 		if err != nil {
+			fmt.Fprintln(os.Stderr, "brain: Warnung: Workspaces nicht gefunden:", err)
+			return nil, nil
+		}
+	} else {
+		var ok bool
+		if out, ok = githubCellLines(root); !ok {
 			return nil, nil
 		}
 	}
@@ -56,6 +53,33 @@ func discoverCells(root string) (added, gone []string) {
 		}
 	}
 	return
+}
+
+// githubCellLines: Zellen über die GitHub CLI ("name clone_url" je Zeile); ok=false ohne gh/Org.
+func githubCellLines(root string) (string, bool) {
+	gh, err := exec.LookPath("gh")
+	if err != nil {
+		return "", false
+	}
+	url, err := runTimeout(10, "git", "-C", root, "remote", "get-url", "origin")
+	if err != nil {
+		return "", false
+	}
+	org := orgFromURL(strings.TrimSpace(url))
+	if org == "" {
+		return "", false
+	}
+	out, err := runTimeout(30, gh, "api", "--paginate", "orgs/"+org+"/repos?per_page=100",
+		"--jq", `.[] | select((.topics // []) | index("brain-cell")) | .name + " " + .clone_url`)
+	if err != nil {
+		// privater Account statt Organisation
+		out, err = runTimeout(30, gh, "api", "--paginate", "user/repos?per_page=100&affiliation=owner,collaborator,organization_member",
+			"--jq", `.[] | select(.owner.login == "`+org+`") | select((.topics // []) | index("brain-cell")) | .name + " " + .clone_url`)
+		if err != nil {
+			return "", false
+		}
+	}
+	return out, true
 }
 
 func orgFromURL(u string) string {

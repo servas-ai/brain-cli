@@ -31,7 +31,20 @@ Vorgebaute Binaries: https://github.com/servas-ai/brain-cli/releases/latest (`br
 | `brain clone-cell <git-url> [--name <slug>]` | Workspace-Zelle nach `workspaces/<slug>` klonen, per Sparse-Checkout ohne `AGENTS.md`, `CLAUDE.md`, `.claude/`, `.codex/` |
 | `brain check [--root <dir>]` | Pflichtfelder im Frontmatter, max. 40 Kinder, keine Harness-Dateien in Zellen, `superseded_by` bei `superseded`; Exit 1 bei Verstößen |
 | `brain doctor` | git, `core.longpaths` (Windows), OneDrive-Pfad, `qdrantcli`/`sharepointcli`, `.ignore` |
+| `brain login [--url <forge-url>] [--no-open]` | Forge-Brain: Token-Seite öffnen, Token von stdin lesen, prüfen und mit `git credential approve` ablegen (ohne `credential.helper` vorher `credential.helper store`) |
 | `brain version` | Version |
+
+### Forge-Brain (Forgejo statt GitHub)
+
+Liegt das Brain auf einer eigenen Forgejo-Instanz, steht im Root `.brain/forge.yml`:
+
+```yaml
+typ: forgejo
+url: https://git.example.com:8443
+org: brain
+```
+
+Dann findet `brain sync` die Workspaces über `GET /api/v1/orgs/<org>/repos` (seitenweise, Topic `brain-cell`) mit dem Token aus `git credential fill` (abgelegt mit `brain login`); `gh` wird nicht gebraucht, die Update-Prüfung gegen GitHub ist aus. Ohne die Datei bleibt alles wie bisher.
 
 Root: `--root` oder ab dem aktuellen Verzeichnis nach oben bis zur ersten `AGENTS.md`.
 

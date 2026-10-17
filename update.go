@@ -138,7 +138,8 @@ func newer(a, b string) bool {
 
 // updateNotices returns human-readable lines for every component that has a newer version.
 func updateNotices(root string, force bool) []string {
-	if os.Getenv("BRAIN_NO_UPDATE_CHECK") == "1" {
+	// Forge-Brain (.brain/forge.yml): keine Update-Prüfung gegen GitHub
+	if os.Getenv("BRAIN_NO_UPDATE_CHECK") == "1" || forgeActive(root) {
 		return nil
 	}
 	latest := latestVersions(force)
@@ -189,6 +190,10 @@ func cmdUpdateCheck(args []string) int {
 	root, err := findRoot("")
 	if err != nil {
 		root = "."
+	}
+	if forgeActive(root) {
+		fmt.Println("brain update-check: aus (Forge-Brain, .brain/forge.yml)")
+		return 0
 	}
 	notices := updateNotices(root, true)
 	if len(notices) == 0 {

@@ -94,7 +94,7 @@ func cmdSync(args []string) int {
 	if err == nil {
 		err = writePerspektive(r, *persp)
 	}
-	if err == nil && !*noUpd {
+	if err == nil && !*noUpd && !forgeActive(r) {
 		notices := updateNotices(r, false)
 		appendUpdatesToPerspektive(r, notices)
 		for _, n := range notices {
