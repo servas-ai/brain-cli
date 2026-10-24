@@ -85,9 +85,9 @@ flowchart LR
  R --> C
 ```
 
-### 🖼️ Screenshots and visuals
+### 🖼️ Screenshots
 
-Use only checked-in screenshots captured from the actual tested build. No verified runtime screenshot was found in the README during this pass; no mock screenshot is represented as production evidence.
+No screenshot image is present in the README at the reviewed revision. Capture a real UI screenshot from a pinned, tested build before adding one; do not use a mockup as runtime evidence.
 
 ### ✅ Readiness checklist
 
