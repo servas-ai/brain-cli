@@ -30,7 +30,12 @@ func discoverCells(root string) (added, gone []string) {
 		out, err = runTimeout(30, gh, "api", "--paginate", "user/repos?per_page=100&affiliation=owner,collaborator,organization_member",
 			"--jq", `.[] | select(.owner.login == "`+org+`") | select((.topics // []) | index("brain-cell")) | .name + " " + .clone_url`)
 		if err != nil {
-			return nil, nil
+			// GitHub-App-Installationstoken (Agents ohne eigenen Login, z. B. DKS): sieht nur die Repos der Installation
+			out, err = runTimeout(30, gh, "api", "--paginate", "installation/repositories?per_page=100",
+				"--jq", `.repositories[] | select(.owner.login == "`+org+`") | select((.topics // []) | index("brain-cell")) | .name + " " + .clone_url`)
+			if err != nil {
+				return nil, nil
+			}
 		}
 	}
 	seen := map[string]bool{}
