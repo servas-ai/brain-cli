@@ -15,7 +15,18 @@ for t in $TARGETS; do
   cp README.md LICENSE THIRD-PARTY.md CHANGELOG.md "$stage/"
   cp -R docs "$stage/docs"
   if [ "$os" = windows ]; then
-    (cd "$stage" && zip -qr "../../$name.zip" .)
+    if command -v zip >/dev/null 2>&1; then
+      (cd "$stage" && zip -qr "../../$name.zip" .)
+    else
+      python3 - "$stage" "dist/$name.zip" <<'PY'
+import pathlib, sys, zipfile
+root = pathlib.Path(sys.argv[1])
+with zipfile.ZipFile(sys.argv[2], "w", zipfile.ZIP_DEFLATED) as archive:
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            archive.write(path, path.relative_to(root))
+PY
+    fi
   else
     tar -C "$stage" -czf "dist/$name.tar.gz" .
   fi

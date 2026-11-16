@@ -151,6 +151,7 @@ never enter URLs or process arguments.
 
 ## Build and verify without a real account
 
+Packaging also needs tar, sha256sum and either zip or Python 3.
 Run in your own test directory, with caches/temp outside a Paperclip workspace:
 
 ```sh
