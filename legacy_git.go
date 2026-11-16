@@ -123,7 +123,9 @@ func brainGitNeedsOIDC(args []string) bool {
 
 func preflightBrainGit(args []string) error {
 	if !forgeGitMode && !brainGitNeedsOIDC(args) {
-		return nil
+		c := githubGit(args)
+		defer c.cleanup()
+		return c.preparationError
 	}
 	c := authenticatedGit(args)
 	defer c.cleanup()

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0-rc.4 — 2026-11-16
+## 0.2.0-rc.5 — 2026-11-16
 
 - Replace Forge PAT stdin login and global credential-store writes with a pinned
   Zitadel browser/loopback PKCE client, private session storage and verified refresh.
@@ -15,5 +15,7 @@
 - Add a gated signed clidist updater with a separate Human session, version-bound
   checksums, Linux atomic replacement and verified rollback. No live publication;
   Windows replacement remains open. Convert legacy CLI output/guidance to English.
+- Isolate the GitHub transport as well, retaining only its explicit existing gh
+  identity instead of inheriting global Git remote/credential configuration.
 - Windows session encryption uses current-user DPAPI; native Windows/macOS login
   acceptance and live Zitadel/KIRA acceptance remain open.

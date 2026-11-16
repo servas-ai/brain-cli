@@ -9,6 +9,8 @@ CLI issuer or linked by email. No customer server is needed for local tests.
 ## Prerequisites supplied by the operator
 
 - Git 2.40+ and a normal browser on the same computer as `brain`.
+- Existing GitHub workflows additionally require the existing authenticated `gh` CLI.
+  Forge workflows never use `gh` as an authentication fallback.
 - An existing authorized public native client at `https://auth.servas.ai` with
   Authorization Code + PKCE S256, no client secret; JWT/RS256 access tokens with jti, nbf, iat and exact native-client azp (ID tokens are rejected as credentials).
 - Loopback registration `http://127.0.0.1:<ephemeral-port>/callback` with the
@@ -36,7 +38,7 @@ be reused merely because its ID is known.
 ## Obtain the client
 
 Use the archive and `SHA256SUMS` attached to the implementation issue. The
-candidate version is `0.2.0-rc.4`; it is not a signed clidist production release.
+candidate version is `0.2.0-rc.5`; it is not a signed clidist production release.
 All six OS/architecture archives are cross-built; Linux amd64 is exercised.
 Windows DPAPI and macOS runtime behavior need their native acceptance before
 claiming support for production Human login on those platforms.
@@ -46,7 +48,7 @@ Linux amd64 (macOS: use the matching darwin archive):
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
 # Require the selected archive's line to say OK; no missing/all-skipped result.
-tar -xzf brain_0.2.0-rc.4_linux_amd64.tar.gz
+tar -xzf brain_0.2.0-rc.5_linux_amd64.tar.gz
 install -d "$HOME/.local/bin"
 install -m 0755 brain "$HOME/.local/bin/brain"
 export PATH="$HOME/.local/bin:$PATH"
@@ -137,8 +139,11 @@ org: brain
 `brain sync` uses the verified OIDC session for Forge discovery and network Git;
 returned clone URLs must remain on the configured origin. Failed authentication
 aborts a Forge sync before any pull, without falling back to a stored PAT.
-HTTPS GitHub brains continue to use the pre-existing GitHub credential path,
-with redirects disabled. Every other remote requires the isolated OIDC worker,
+HTTPS GitHub brains retain their existing `gh` identity in a separate isolated
+Git process. Only the fixed GitHub credential helper sees the original gh login
+configuration; Git itself receives an empty home/global configuration and template.
+Ambient Git credential stores, headers, remote overrides and cookies are ignored.
+Redirects are disabled. Every other remote requires the isolated OIDC worker,
 even if `.brain/forge.yml` is missing or the saved profile is absent or invalid.
 `sync` checks the root, workspaces and personal remotes before its first pull;
 Git URL rewrites and direct branch-remote URLs outside GitHub cannot opt into
@@ -180,7 +185,7 @@ export GOCACHE=/srv/test/pc-tool-verify/DKS-735/cache/go-build
 mkdir -p "$TMPDIR" "$GOPATH" "$GOCACHE"
 go test -race ./...
 go vet ./...
-VERSION=0.2.0-rc.4 ./build.sh
+VERSION=0.2.0-rc.5 ./build.sh
 ```
 
 Tests generate their own local TLS IdP, signing keys and identities. The Git

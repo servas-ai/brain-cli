@@ -190,7 +190,8 @@ func cmdAuth(args []string) int {
 		}
 		p := oidcProfile{Issuer: humanIssuer, ClientID: *client, Audience: *aud, ForgeURL: strings.TrimRight(*forge, "/"), Scopes: requestedScopes}
 		if err := validateProfile(p); err != nil {
-			return authError(err)
+			fmt.Fprintln(os.Stderr, "brain auth:", err)
+			return 2
 		}
 		if err := writeAuthFile("profile.json", p); err != nil {
 			return authError(err)
