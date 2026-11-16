@@ -596,3 +596,17 @@ func TestOIDCAccessClaimShape(t *testing.T) {
 		})
 	}
 }
+
+func TestOIDCProfileRejectsAdditionalResourceScopes(t *testing.T) {
+	p := oidcProfile{Issuer: humanOIDCIssuer, ClientID: "public-native", Audience: "forge-resource", ForgeURL: "https://git.example.invalid", Scopes: []string{"openid", "offline_access", "urn:zitadel:iam:org:project:id:forge-resource:aud"}}
+	if err := validateProfile(p); err != nil {
+		t.Fatal(err)
+	}
+	for _, scope := range []string{"urn:zitadel:iam:org:project:id:zitadel:aud", "urn:zitadel:iam:org:project:id:another-resource:aud", "openid", "email"} {
+		other := p
+		other.Scopes = append(append([]string{}, p.Scopes...), scope)
+		if validateProfile(other) == nil {
+			t.Fatal("additional/duplicate scope accepted")
+		}
+	}
+}

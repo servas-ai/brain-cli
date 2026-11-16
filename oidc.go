@@ -57,13 +57,16 @@ func validateProfile(p oidcProfile) error {
 	if forge, err := oidcHTTPS(p.ForgeURL); err != nil || forge.Path != "" || forge.RawPath != "" {
 		return errors.New("invalid Forge URL")
 	}
+	requiredScopes := []string{"openid", "offline_access", "urn:zitadel:iam:org:project:id:" + p.Audience + ":aud"}
+	seenScopes := map[string]bool{}
 	for _, scope := range p.Scopes {
-		if !oidcScope(scope) {
-			return errors.New("invalid OIDC scope")
+		if !oidcScope(scope) || !oidcContains(requiredScopes, scope) || seenScopes[scope] {
+			return errors.New("OIDC profile must use only the three minimal resource scopes")
 		}
+		seenScopes[scope] = true
 	}
-	for _, required := range []string{"openid", "offline_access", "urn:zitadel:iam:org:project:id:" + p.Audience + ":aud"} {
-		if !oidcContains(p.Scopes, required) {
+	for _, required := range requiredScopes {
+		if !seenScopes[required] {
 			return errors.New("OIDC profile lacks required scopes")
 		}
 	}

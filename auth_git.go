@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -101,7 +102,24 @@ func gitArguments(args []string, origin string) ([]string, string, error) {
 	if !allowed[command] {
 		return nil, "", invalid
 	}
+	if command == "clone" {
+		if err := gitCloneArguments(args[i+1:], origin); err != nil {
+			return nil, "", err
+		}
+	}
+	if command == "config" {
+		fields := args[i+1:]
+		if len(fields) > 0 && (fields[0] == "--local" || fields[0] == "--get") {
+			fields = fields[1:]
+		}
+		if len(fields) < 1 || len(fields) > 2 || (fields[0] != "user.name" && fields[0] != "user.email") {
+			return nil, "", invalid
+		}
+	}
 	for _, a := range args[i+1:] {
+		if strings.HasPrefix(a, "--rec") {
+			return nil, "", invalid
+		}
 		if (a == "-c" && command == "clone") || strings.HasPrefix(a, "--config") || a == "--global" || a == "--system" || a == "--file" || a == "-f" && command == "config" {
 			return nil, "", invalid
 		}
@@ -110,6 +128,59 @@ func gitArguments(args []string, origin string) ([]string, string, error) {
 		}
 	}
 	return options, command, nil
+}
+
+// Clone creates its repository after preflight. Accept only the small options
+// needed by this workflow; templates/config/reference/submodule knobs can load
+// a different transport/auth configuration before its first network request.
+func gitCloneArguments(args []string, origin string) error {
+	invalid := errors.New("unsupported clone option; use HTTPS clone without templates or transport overrides")
+	positional := 0
+	endOptions := false
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" && !endOptions {
+			endOptions = true
+			continue
+		}
+		if !endOptions && strings.HasPrefix(a, "-") {
+			if a == "--no-checkout" || a == "--single-branch" || a == "--quiet" || a == "-q" {
+				continue
+			}
+			key, value, hasValue := strings.Cut(a, "=")
+			if key != "--depth" && key != "--branch" && key != "--filter" {
+				return invalid
+			}
+			if !hasValue {
+				i++
+				if i >= len(args) {
+					return invalid
+				}
+				value = args[i]
+			}
+			if value == "" || strings.HasPrefix(value, "-") || strings.ContainsAny(value, "\r\n\x00") {
+				return invalid
+			}
+			if key == "--depth" {
+				n, err := strconv.Atoi(value)
+				if err != nil || n < 1 {
+					return invalid
+				}
+			}
+			if key == "--filter" && value != "blob:none" {
+				return invalid
+			}
+			continue
+		}
+		if positional == 0 && !validForgeClone(origin, a) {
+			return errors.New("clone requires a repository on the configured HTTPS Forge origin")
+		}
+		positional++
+	}
+	if positional < 1 || positional > 2 {
+		return invalid
+	}
+	return nil
 }
 
 func checkGitLocalConfig(options, env []string, origin string) error {
@@ -168,6 +239,9 @@ func authenticatedGit(args []string) *authGitCommand {
 		return fail(errors.New("cannot isolate Git authentication"))
 	}
 	c.cleanup = func() { os.RemoveAll(processHome) }
+	if err := os.Mkdir(filepath.Join(processHome, "template"), 0700); err != nil {
+		return fail(errors.New("cannot create empty Git template"))
+	}
 	env := cleanGitEnv()
 	for k, v := range map[string]string{"HOME": processHome, "USERPROFILE": processHome, "XDG_CONFIG_HOME": filepath.Join(processHome, ".config"), "CURL_HOME": processHome, "_BRAIN_GIT_AUTH_DIR": d} {
 		env = gitEnvSet(env, k, v)
@@ -182,8 +256,13 @@ func authenticatedGit(args []string) *authGitCommand {
 		return fail(errors.New("cannot locate Brain credential helper"))
 	}
 	helper := "!'" + strings.ReplaceAll(filepath.ToSlash(exe), "'", "'\\''") + "' git-credential"
-	prefix := []string{"--no-pager", "-c", "credential.helper=", "-c", "credential.helper=" + helper, "-c", "credential.useHttpPath=true", "-c", "http.followRedirects=false", "-c", "http.sslVerify=true", "-c", "http.extraHeader=", "-c", "http.cookieFile=", "-c", "http.saveCookies=false", "-c", "http.emptyAuth=false", "-c", "http.delegation=none", "-c", "core.hooksPath=" + filepath.Join(processHome, "hooks")}
-	c.Cmd = exec.Command("git", append(prefix, args...)...)
+	prefix := []string{"--no-pager", "-c", "credential.helper=", "-c", "credential.helper=" + helper, "-c", "credential.useHttpPath=true", "-c", "http.followRedirects=false", "-c", "http.sslVerify=true", "-c", "http.extraHeader=", "-c", "http.saveCookies=false", "-c", "http.emptyAuth=false", "-c", "http.delegation=none", "-c", "core.hooksPath=" + filepath.Join(processHome, "hooks"), "-c", "fetch.recurseSubmodules=false", "-c", "submodule.recurse=false", "-c", "push.recurseSubmodules=no"}
+	safeArgs := append([]string{}, args...)
+	if command == "clone" {
+		at := len(options) + 1
+		safeArgs = append(append(append([]string{}, args[:at]...), "--template="+filepath.Join(processHome, "template")), args[at:]...)
+	}
+	c.Cmd = exec.Command("git", append(prefix, safeArgs...)...)
 	c.Env = env
 	return c
 }

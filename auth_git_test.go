@@ -152,7 +152,7 @@ func TestGitScopedTLSBypassIgnoredWithValidSession(t *testing.T) {
 }
 
 func TestGitArgumentsRejectAuthenticationOverrides(t *testing.T) {
-	for _, args := range [][]string{{"-c", "http.sslVerify=false", "fetch"}, {"clone", "--config=http.extraHeader=secret", "https://git.example.invalid/a.git"}, {"clone", "https://name:password@git.example.invalid/a.git"}, {"clone", "ssh://git@git.example.invalid/a.git"}, {"arbitrary-alias"}} {
+	for _, args := range [][]string{{"-c", "http.sslVerify=false", "fetch"}, {"clone", "--config=http.extraHeader=secret", "https://git.example.invalid/a.git"}, {"clone", "https://name:password@git.example.invalid/a.git"}, {"clone", "ssh://git@git.example.invalid/a.git"}, {"arbitrary-alias"}, {"clone", "--temp=/some/template", "https://git.example.invalid/a.git"}, {"clone", "-chttp.sslVerify=false", "https://git.example.invalid/a.git"}, {"clone", "--reference=/some/repo", "https://git.example.invalid/a.git"}, {"fetch", "--recurse-submodules"}} {
 		if _, _, err := gitArguments(args, "https://git.example.invalid"); err == nil {
 			t.Fatal("unsafe Git arguments accepted")
 		}

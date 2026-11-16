@@ -180,11 +180,15 @@ func cmdAuth(args []string) int {
 		client := fs.String("client-id", "", "Registered public native Zitadel client ID")
 		aud := fs.String("audience", "", "Registered Forge resource audience")
 		forge := fs.String("url", "", "HTTPS Forge origin with the OIDC adapter")
-		scopes := fs.String("scopes", "openid offline_access", "Space-separated registered scopes, including the resource audience scope")
+		scopes := fs.String("scopes", "", "Optional exact minimal scopes; derived from the resource audience by default")
 		if fs.Parse(args[1:]) != nil || fs.NArg() != 0 {
 			return 2
 		}
-		p := oidcProfile{Issuer: humanIssuer, ClientID: *client, Audience: *aud, ForgeURL: strings.TrimRight(*forge, "/"), Scopes: strings.Fields(*scopes)}
+		requestedScopes := strings.Fields(*scopes)
+		if len(requestedScopes) == 0 {
+			requestedScopes = []string{"openid", "offline_access", "urn:zitadel:iam:org:project:id:" + *aud + ":aud"}
+		}
+		p := oidcProfile{Issuer: humanIssuer, ClientID: *client, Audience: *aud, ForgeURL: strings.TrimRight(*forge, "/"), Scopes: requestedScopes}
 		if err := validateProfile(p); err != nil {
 			return authError(err)
 		}

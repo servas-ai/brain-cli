@@ -16,7 +16,8 @@ CLI issuer or linked by email. No customer server is needed for local tests.
   port must be confirmed on the registered client before activation.
 - The resource **project** ID as the expected access-token audience, and
   `openid offline_access urn:zitadel:iam:org:project:id:RESOURCE_PROJECT_ID:aud`.
-  Do not use the reserved `zitadel` management API audience.
+  Only these three minimal scopes are accepted (derived by default from the
+  audience). Additional resource or management API scopes are rejected.
 - The existing HTTPS Forge origin, repository path, existing Zitadel Human
   identity and explicit `(issuer, sub) -> existing Forgejo user ID` mapping.
   Existing repository/team/branch rights must cover read, a proposal branch
@@ -56,7 +57,8 @@ brain guide
 On macOS use `shasum -a 256 -c SHA256SUMS` with the selected archive's checksum
 line. On Windows extract the matching ZIP, compare `Get-FileHash -Algorithm
 SHA256` against the exact archive line in `SHA256SUMS`, then place `brain.exe`
-in a user PATH directory. Keep the included `LICENSE`, `THIRD-PARTY.md` and docs.
+in a user PATH directory. Run the shell workflow below in Git Bash (included
+with Git for Windows). Keep the included `LICENSE`, `THIRD-PARTY.md` and docs.
 
 ## Configure and sign in
 
@@ -116,7 +118,11 @@ Git's internal credential pipe only to the configured HTTPS origin. Repository
 HTTP/credential overrides and remote URLs outside that origin are rejected.
 Use the OS trust store or `GIT_SSL_CAINFO` for a private CA. The wrapper supports
 the documented Git workflow and common local commands; arbitrary Git aliases
-and authentication overrides are not supported. It does not install a global
+and authentication overrides are not supported. Clone accepts the normal HTTPS
+URL/target plus --no-checkout, --single-branch, --quiet, --depth, --branch and
+--filter=blob:none. It uses an empty template; user-supplied templates and
+recursive submodule transports are rejected. The config command is limited to
+your public user.name/user.email. It does not install a global
 helper or populate a Git credential store. Repository permissions remain server
 decisions. Ordinary bare `git push` is not configured by login.
 
