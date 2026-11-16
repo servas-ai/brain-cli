@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -24,6 +23,14 @@ func authDir() (string, error) {
 		return "", errors.New("cannot locate user configuration")
 	}
 	d = filepath.Join(d, "brain", "auth")
+	if len(os.Args) > 1 && os.Args[1] == "git-credential" {
+		if gitStore := os.Getenv("_BRAIN_GIT_AUTH_DIR"); gitStore != "" {
+			if !filepath.IsAbs(gitStore) {
+				return "", errors.New("invalid credential helper store")
+			}
+			d = gitStore
+		}
+	}
 	if err := os.MkdirAll(d, 0700); err != nil {
 		return "", errors.New("cannot create authentication directory")
 	}
@@ -322,49 +329,5 @@ func cmdGitCredential(args []string) int {
 		return 1
 	}
 	fmt.Fprintf(os.Stdout, "username=oidc\npassword=%s\n\n", token)
-	return 0
-}
-
-func cleanGitEnv() []string {
-	var out []string
-	for _, s := range os.Environ() {
-		k, _, _ := strings.Cut(s, "=")
-		if strings.HasPrefix(k, "GIT_TRACE") || strings.HasPrefix(k, "GIT_CONFIG_") || k == "GIT_CURL_VERBOSE" || k == "GIT_ASKPASS" || k == "SSH_ASKPASS" || k == "GIT_SSL_NO_VERIFY" || k == "GIT_CONFIG" {
-			continue
-		}
-		out = append(out, s)
-	}
-	return append(out, "GIT_TERMINAL_PROMPT=0", "GCM_INTERACTIVE=never", "GIT_TRACE_REDACT=1")
-}
-
-func authenticatedGit(args []string) *exec.Cmd {
-	exe, _ := os.Executable()
-	// Git runs helper commands through its shell on every supported platform.
-	helper := "!" + "'" + strings.ReplaceAll(filepath.ToSlash(exe), "'", "'\\''") + "' git-credential"
-	prefix := []string{"-c", "credential.helper=", "-c", "credential.helper=" + helper, "-c", "credential.useHttpPath=true", "-c", "http.followRedirects=false", "-c", "http.sslVerify=true", "-c", "http.extraHeader="}
-	c := exec.Command("git", append(prefix, args...)...)
-	c.Env = cleanGitEnv()
-	return c
-}
-
-func cmdGit(args []string) int {
-	if len(args) > 0 && args[0] == "--" {
-		args = args[1:]
-	}
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Usage: brain git -- <git arguments>")
-		return 2
-	}
-	if _, err := savedProfile(); err != nil {
-		return authError(err)
-	}
-	c := authenticatedGit(args)
-	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := c.Run(); err != nil {
-		if e, ok := err.(*exec.ExitError); ok {
-			return e.ExitCode()
-		}
-		return authError(errors.New("cannot run Git"))
-	}
 	return 0
 }

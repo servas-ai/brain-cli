@@ -109,12 +109,16 @@ brain propose --repo "$REPOSITORY" --branch proposal/first-change \
 
 The final command prints the proposal URL. Use the existing Dashboard workflow
 for its review/acceptance; the client does not merge it or grant rights. Use
-`brain git -- fetch origin` for subsequent fetches. Keep `brain git` for network
-Git operations: it resets credential helpers for that invocation, disables
-redirects and credential traces, and passes a short-lived access token through
-Git's internal credential pipe only to the configured HTTPS origin. It does not
-install a global helper or populate a Git credential store. Repository permissions
-remain server decisions. Ordinary bare `git push` is not configured by login.
+`brain git -- fetch origin` for subsequent fetches. The wrapper requires a valid
+OIDC session, isolates ambient Git config/cookies/.netrc/client certificates,
+disables redirects and credential traces, and passes the access token through
+Git's internal credential pipe only to the configured HTTPS origin. Repository
+HTTP/credential overrides and remote URLs outside that origin are rejected.
+Use the OS trust store or `GIT_SSL_CAINFO` for a private CA. The wrapper supports
+the documented Git workflow and common local commands; arbitrary Git aliases
+and authentication overrides are not supported. It does not install a global
+helper or populate a Git credential store. Repository permissions remain server
+decisions. Ordinary bare `git push` is not configured by login.
 
 For a Forge Brain keep the existing non-secret `.brain/forge.yml`:
 
@@ -151,7 +155,9 @@ never enter URLs or process arguments.
 
 ## Build and verify without a real account
 
-Packaging also needs tar, sha256sum and either zip or Python 3.
+Packaging also needs Python 3, tar and sha256sum (zip is optional).
+Each archive includes MANIFEST.json with its source revision and unsigned-build status.
+For a focused Linux build use TARGETS=linux/amd64; the default builds all six targets.
 Run in your own test directory, with caches/temp outside a Paperclip workspace:
 
 ```sh

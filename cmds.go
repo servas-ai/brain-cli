@@ -32,14 +32,14 @@ func runTimeout(sec int, bin string, args ...string) (string, error) {
 var forgeGitMode bool
 
 func git(args ...string) error {
-	c := exec.Command("git", args...)
 	if forgeGitMode {
-		c = authenticatedGit(args)
+		c := authenticatedGit(args)
+		c.Stdout, c.Stderr = os.Stderr, os.Stderr
+		return c.Run()
 	}
+	c := exec.Command("git", args...)
 	c.Stdout, c.Stderr = os.Stderr, os.Stderr
-	if c.Env == nil {
-		c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	}
+	c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	return c.Run()
 }
 

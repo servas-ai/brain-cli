@@ -253,7 +253,7 @@ func TestGitEnvironmentDoesNotEnableCredentialTracing(t *testing.T) {
 		if strings.HasPrefix(entry, "GIT_TRACE") && entry != "GIT_TRACE_REDACT=1" {
 			t.Fatal("trace inherited")
 		}
-		if strings.HasPrefix(entry, "GIT_CONFIG_") || strings.HasPrefix(entry, "GIT_SSL_NO_VERIFY=") {
+		if (strings.HasPrefix(entry, "GIT_CONFIG_") && entry != "GIT_CONFIG_NOSYSTEM=1" && entry != "GIT_CONFIG_GLOBAL="+os.DevNull && entry != "GIT_CONFIG_SYSTEM="+os.DevNull) || strings.HasPrefix(entry, "GIT_SSL_NO_VERIFY=") {
 			t.Fatal("unsafe Git environment inherited")
 		}
 	}

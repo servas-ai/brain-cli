@@ -1,10 +1,10 @@
 # KIRA / Forgejo / Zitadel: belegter Anschlussvertrag
 
-Stand 2026-11-16, ausschließlich lesende Quellenprüfung. KIRA `servas-ai/kira-nas` main = **788827c4a889e0854c571cf5475109b261098ee3**; Forgejo-Pin **15.0.10-rootless** (`ansible/roles/stack/defaults/main.yml:29`). Der vorhandene GitHub-Connector liest das private Repo; die lokale gh-Auth konnte es nicht auflösen. Ausgewählte gelesene Dateien liegen als unveränderte Arbeitskopie unter `kira-source/`, öffentliche Forgejo-Quellen unter `forgejo-upstream/`. Kein Kundenserver, Login, Konto, Grant, Infra, KIRA-Code, Push oder Merge wurde ausgeführt.
+Stand 2026-11-16, ausschließlich lesende Quellenprüfung. KIRA `servas-ai/kira-nas` main = **788827c4a889e0854c571cf5475109b261098ee3**; Forgejo-Pin **15.0.10-rootless** (`ansible/roles/stack/defaults/main.yml:29`). Der vorhandene GitHub-Connector liest das private Repo; die lokale gh-Auth konnte es nicht auflösen. Kein Kundenserver, Login, Konto, Grant, Infra, KIRA-Code, Push oder Merge wurde ausgeführt.
 
 ## Urteil und Bestand
 
-**Kein vorhandenes Zitadel→Forgejo-Gateway belegt.** Der KIRA-Main-Stack bietet Pocket-ID-Web-OIDC sowie einen privilegierten internen API-Sudo-Weg; er akzeptiert Zitadel-Access-Tokens nicht unmittelbar. Ein rein lokaler CLI-Prototyp muss vor einem späteren Einsatz an einen zusätzlich umgesetzten und getrennt freigegebenen Gateway-Vertrag gebunden werden. Ohne belegte bestehende Zitadel-Parameter bleibt der Live-Weg geschlossen.
+**Kein vorhandenes Zitadel→Forgejo-Gateway belegt.** Der KIRA-Main-Stack bietet Pocket-ID-Web-OIDC sowie einen privilegierten internen API-Sudo-Weg; er akzeptiert Zitadel-Access-Tokens nicht unmittelbar. Ein rein lokaler CLI-Prototyp muss vor einem späteren Einsatz an einen vom KIRA-Lead implementierten und abgenommenen Gateway-Vertrag gebunden werden. Ohne belegte bestehende Zitadel-Parameter bleibt der Live-Weg geschlossen.
 
 - [OIDC-Verifier](https://github.com/servas-ai/kira-nas/blob/788827c4a889e0854c571cf5475109b261098ee3/services/kira-brain/oidc.go#L61): RS256, Signatur/JWKS, exakt `iss`, Zeitprüfung, `aud` enthält **Issuer**, `client_id == konfigurierter Client` (:79–119). Das ist der bestehende Pocket-ID-Vertrag, keine erlaubte Ausnahme für den neuen strikt Zitadel-gepinnten Weg.
 - [Identitätsauflösung](https://github.com/servas-ai/kira-nas/blob/788827c4a889e0854c571cf5475109b261098ee3/services/kira-brain/clients.go#L178): `GET /api/v1/admin/users?login_name=<sub>&source_id=<konfigurierte Quelle>`; Treffer muss `LoginName == sub` sein (:178–201). Ohne SourceID wird jede externe Quelle akzeptiert: für neuen Vertrag unzureichend. [rights.go:45–83](https://github.com/servas-ai/kira-nas/blob/788827c4a889e0854c571cf5475109b261098ee3/services/kira-brain/rights.go#L45) verlangt UserInfo.sub-Gleichheit, lehnt Site-Admins ab und schneidet Forgejo-Sicht mit Gruppen-/Mirror-Sicht.
@@ -82,3 +82,8 @@ Der Clientvertrag verlangt für Access-Tokens zusätzlich `jti`, `nbf`, `iat`,
 exaktes `azp` des nativen Clients und keine ID-Nonce/`at_hash`; ID-Tokens dürfen
 nicht als API-/Git-Credential angenommen werden. Das muss der KIRA-Adapter
 unabhängig erzwingen. Grundlage: [Zitadel Claim-Matrix](https://zitadel.com/docs/apis/openidoauth/claims).
+
+Der Adapter soll in einen vorhandenen KIRA-Dienst integriert werden (z. B.
+`services/kira-brain` mit explizitem separatem CLI-Verifier). Kein neuer Host,
+IdP, externer Dienst oder Cluster ist Teil des Vertrags. Ein bloßer zusätzlicher
+Caddy-Header ohne Access-Token-Verifikation und Allowlist reicht nicht.

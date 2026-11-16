@@ -113,8 +113,8 @@ This client does not create clients, grants, identities or access keys.
   brain propose --repo brain/brain --branch proposal/first-change --title 'First proposal'
   brain auth logout
 
-Use brain git for Clone/Fetch/Push. It isolates credential helpers for this
-invocation and supplies tokens only to the configured HTTPS Forge origin.
+Use brain git for Clone/Fetch/Push. It requires a valid OIDC session, isolates ambient credentials and Git config,
+and supplies tokens only to the configured HTTPS Forge origin.
 It never installs a global helper. Refresh is automatic; failures require a
 new browser login. Status prints secret-free JSON. Exit codes: 0 success,
 1 authentication/network/operation failure, 2 invalid command arguments.
