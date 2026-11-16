@@ -40,13 +40,13 @@ func authDPAPI(data []byte, protect bool) ([]byte, error) {
 	return append([]byte(nil), unsafe.Slice(out.Data, out.Size)...), nil
 }
 func sealAuthData(name string, data []byte) ([]byte, error) {
-	if name != "session.json" {
+	if name != "session.json" && name != "update-session.json" {
 		return data, nil
 	}
 	return authDPAPI(data, true)
 }
 func unsealAuthData(name string, data []byte) ([]byte, error) {
-	if name != "session.json" {
+	if name != "session.json" && name != "update-session.json" {
 		return data, nil
 	}
 	return authDPAPI(data, false)
