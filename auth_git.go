@@ -206,7 +206,7 @@ func checkGitLocalConfig(options, env []string, origin string) error {
 				if !validForgeClone(origin, value) {
 					return errors.New("repository remote is outside the configured HTTPS Forge origin")
 				}
-			} else if strings.HasSuffix(key, ".proxy") || strings.HasSuffix(key, ".uploadpack") || strings.HasSuffix(key, ".receivepack") {
+			} else if strings.HasSuffix(key, ".proxy") || strings.HasSuffix(key, ".uploadpack") || strings.HasSuffix(key, ".receivepack") || strings.HasSuffix(key, ".vcs") {
 				return errors.New("local Git remote transport overrides are not allowed")
 			}
 		}

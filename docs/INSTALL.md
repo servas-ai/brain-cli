@@ -36,7 +36,7 @@ be reused merely because its ID is known.
 ## Obtain the client
 
 Use the archive and `SHA256SUMS` attached to the implementation issue. The
-candidate version is `0.2.0-rc.3`; it is not a signed clidist production release.
+candidate version is `0.2.0-rc.4`; it is not a signed clidist production release.
 All six OS/architecture archives are cross-built; Linux amd64 is exercised.
 Windows DPAPI and macOS runtime behavior need their native acceptance before
 claiming support for production Human login on those platforms.
@@ -46,7 +46,7 @@ Linux amd64 (macOS: use the matching darwin archive):
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
 # Require the selected archive's line to say OK; no missing/all-skipped result.
-tar -xzf brain_0.2.0-rc.3_linux_amd64.tar.gz
+tar -xzf brain_0.2.0-rc.4_linux_amd64.tar.gz
 install -d "$HOME/.local/bin"
 install -m 0755 brain "$HOME/.local/bin/brain"
 export PATH="$HOME/.local/bin:$PATH"
@@ -141,7 +141,9 @@ HTTPS GitHub brains continue to use the pre-existing GitHub credential path,
 with redirects disabled. Every other remote requires the isolated OIDC worker,
 even if `.brain/forge.yml` is missing or the saved profile is absent or invalid.
 `sync` checks the root, workspaces and personal remotes before its first pull;
-Git URL rewrites outside GitHub cannot opt into the GitHub exception. Legacy
+Git URL rewrites and direct branch-remote URLs outside GitHub cannot opt into
+the GitHub exception. GitHub pulls name their checked upstream explicitly;
+remote transport helpers are rejected and clones use an empty template. Legacy
 SSH and local-file network workflows are not accepted by these commands.
 
 ## Refresh, logout and failures
@@ -178,7 +180,7 @@ export GOCACHE=/srv/test/pc-tool-verify/DKS-735/cache/go-build
 mkdir -p "$TMPDIR" "$GOPATH" "$GOCACHE"
 go test -race ./...
 go vet ./...
-VERSION=0.2.0-rc.3 ./build.sh
+VERSION=0.2.0-rc.4 ./build.sh
 ```
 
 Tests generate their own local TLS IdP, signing keys and identities. The Git

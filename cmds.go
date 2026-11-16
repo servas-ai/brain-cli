@@ -37,6 +37,25 @@ func git(args ...string) error {
 		c.Stdout, c.Stderr = os.Stderr, os.Stderr
 		return c.Run()
 	}
+	options, command := legacyGitParts(args)
+	if command == "pull" {
+		remote, err := githubPullRemote(options)
+		if err != nil {
+			return err
+		}
+		// Never let Git reinterpret branch.*.remote as a direct URL after
+		// preflight. The explicit named remote is the one inspected above.
+		args = append(append(append([]string{}, options...), "pull", "--ff-only"), remote)
+	}
+	if command == "clone" {
+		empty, err := os.MkdirTemp("", "brain-github-template-")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(empty)
+		at := len(options) + 1
+		args = append(append(append([]string{}, args[:at]...), "--template="+empty), args[at:]...)
+	}
 	// The GitHub exception must not follow a redirect into a Forge origin.
 	c := exec.Command("git", append([]string{"-c", "http.followRedirects=false"}, args...)...)
 	c.Stdout, c.Stderr = os.Stderr, os.Stderr

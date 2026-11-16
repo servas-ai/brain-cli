@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0-rc.3 — 2026-11-16
+## 0.2.0-rc.4 — 2026-11-16
 
 - Replace Forge PAT stdin login and global credential-store writes with a pinned
   Zitadel browser/loopback PKCE client, private session storage and verified refresh.

@@ -1,10 +1,57 @@
 package main
 
 import (
+	"errors"
 	"net/url"
 	"os/exec"
 	"strings"
 )
+
+func legacyGitParts(args []string) (options []string, command string) {
+	i := 0
+	for i+1 < len(args) && args[i] == "-C" {
+		options = append(options, args[i], args[i+1])
+		i += 2
+	}
+	if i < len(args) {
+		command = args[i]
+	}
+	return
+}
+
+func githubPullRemote(options []string) (string, error) {
+	probe := func(args ...string) ([]byte, error) {
+		return exec.Command("git", append(append([]string{}, options...), args...)...).Output()
+	}
+	invalid := errors.New("GitHub pull requires a named HTTPS GitHub upstream")
+	branch, err := probe("symbolic-ref", "--quiet", "--short", "HEAD")
+	if err != nil {
+		return "", invalid
+	}
+	upstream, err := probe("config", "--get", "branch."+strings.TrimSpace(string(branch))+".remote")
+	remote := strings.TrimSpace(string(upstream))
+	if err != nil && !gitConfigMissing(err) {
+		return "", invalid
+	}
+	if remote == "" {
+		remote = "origin"
+	}
+	names, err := probe("remote")
+	if err != nil {
+		return "", invalid
+	}
+	for _, name := range strings.Fields(string(names)) {
+		if remote == name && !strings.HasPrefix(name, "-") {
+			return name, nil
+		}
+	}
+	return "", invalid
+}
+
+func gitConfigMissing(err error) bool {
+	var exit *exec.ExitError
+	return errors.As(err, &exit) && exit.ExitCode() == 1
+}
 
 // Only the established HTTPS GitHub route may use its existing credentials.
 // Every other network destination needs the isolated Human OIDC worker, even
@@ -41,6 +88,14 @@ func brainGitNeedsOIDC(args []string) bool {
 		out, err := exec.Command("git", "ls-remote", "--get-url", raw).Output()
 		return err != nil || !githubHTTPS(strings.TrimSpace(string(out)))
 	case "pull":
+		if _, err := githubPullRemote(options); err != nil {
+			return true
+		}
+		// A remote helper can override transport even for a GitHub-looking URL.
+		overrides, err := exec.Command("git", append(append([]string{}, options...), "config", "--get-regexp", `^remote\..*\.vcs$`)...).Output()
+		if len(overrides) != 0 || (err != nil && !gitConfigMissing(err)) {
+			return true
+		}
 		out, err := exec.Command("git", append(options, "remote")...).Output()
 		if err != nil || strings.TrimSpace(string(out)) == "" {
 			return true

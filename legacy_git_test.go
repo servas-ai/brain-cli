@@ -50,6 +50,14 @@ func TestLegacyCloneCellRejectsAmbientCredentials(t *testing.T) {
 }
 
 func TestLegacySyncRejectsAmbientCredentials(t *testing.T) {
+	legacySyncRejectsAmbientCredentials(t, false)
+}
+
+func TestLegacySyncBranchURLRejectsAmbientCredentials(t *testing.T) {
+	legacySyncRejectsAmbientCredentials(t, true)
+}
+
+func legacySyncRejectsAmbientCredentials(t *testing.T, branchURL bool) {
 	dir := t.TempDir()
 	home := filepath.Join(dir, "home")
 	root := filepath.Join(dir, "root")
@@ -81,6 +89,10 @@ func TestLegacySyncRejectsAmbientCredentials(t *testing.T) {
 	mustGit(t, "-C", root, "remote", "add", "origin", srv.URL+"/review.git")
 	mustGit(t, "-C", root, "config", "branch.main.remote", "origin")
 	mustGit(t, "-C", root, "config", "branch.main.merge", "refs/heads/main")
+	if branchURL {
+		mustGit(t, "-C", root, "remote", "set-url", "origin", "https://github.com/servas-ai/brain.git")
+		mustGit(t, "-C", root, "config", "branch.main.remote", srv.URL+"/review.git")
+	}
 	prior := forgeGitMode
 	forgeGitMode = false
 	defer func() { forgeGitMode = prior }()
@@ -144,5 +156,16 @@ func TestLegacyForgeCorruptOrMismatchedProfileFailsClosed(t *testing.T) {
 				t.Fatalf("mixed sync exit=%d", got)
 			}
 		})
+	}
+}
+
+func TestLegacyGitHubTransportHelperRejected(t *testing.T) {
+	isolatedGit(t)
+	root := t.TempDir()
+	mustGit(t, "init", "-q", root)
+	mustGit(t, "-C", root, "remote", "add", "origin", "https://github.com/servas-ai/brain.git")
+	mustGit(t, "-C", root, "config", "remote.origin.vcs", "unsafe-helper")
+	if !brainGitNeedsOIDC([]string{"-C", root, "pull", "--ff-only"}) {
+		t.Fatal("remote helper bypassed GitHub origin boundary")
 	}
 }
