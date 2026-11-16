@@ -10,21 +10,26 @@ import (
 
 var version = "dev"
 
-const usage = `brain – Werkzeug für das Firmen-Brain
+const usage = `brain - company Brain toolkit
 
-Aufruf:
-  brain sync [--root <dir>] [--no-katalog] [--perspektive <md-datei>]
+Usage:
+  brain sync [--root <dir>] [--no-katalog] [--perspektive <markdown-file>]
   brain clone-cell <git-url> [--name <slug>] [--root <dir>]
   brain check [--root <dir>]
   brain doctor [--root <dir>]
-  brain hook stop|compact Hook für Harnesses: Pflicht, Wissen ins Brain zu schreiben
-  brain update-check     neuere Versionen von Framework und Tools auf GitHub prüfen
-  brain login [--url <forge-url>] [--no-open]   Token für das Forge-Brain hinterlegen (stdin)
+  brain hook stop|compact
+  brain update-check
+  brain auth configure|status|logout
+  brain login [--url <forge-origin>] [--root <dir>]
+  brain git -- <git arguments>
+  brain propose --repo owner/repo --branch proposal --title 'Title'
+  brain guide
   brain version
   brain --help
 
-Root-Default: aktuelles Verzeichnis, nach oben bis eine AGENTS.md gefunden wird.
-Forge-Brain: <root>/.brain/forge.yml (typ: forgejo, url, org) statt GitHub.
+Root: current directory, searched upwards for AGENTS.md.
+Forge: <root>/.brain/forge.yml (typ: forgejo, url, org).
+Human login requires a registered Zitadel native client and KIRA API/Git adapter.
 `
 
 func main() {
@@ -47,6 +52,16 @@ func main() {
 		os.Exit(cmdHook(os.Args[2:]))
 	case "login":
 		code = cmdLogin(args)
+	case "auth":
+		code = cmdAuth(args)
+	case "git":
+		code = cmdGit(args)
+	case "git-credential":
+		code = cmdGitCredential(args)
+	case "propose":
+		code = cmdPropose(args)
+	case "guide":
+		fmt.Print(authGuide)
 	case "update-check":
 		os.Exit(cmdUpdateCheck(os.Args[2:]))
 	case "version", "--version", "-v":
@@ -54,7 +69,7 @@ func main() {
 	case "help", "--help", "-h":
 		fmt.Print(usage)
 	default:
-		fmt.Fprintf(os.Stderr, "brain: unbekannter Befehl %q\n\n%s", cmd, usage)
+		fmt.Fprintf(os.Stderr, "brain: unknown command %q\n\n%s", cmd, usage)
 		code = 2
 	}
 	os.Exit(code)

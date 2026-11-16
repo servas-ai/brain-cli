@@ -29,10 +29,17 @@ func runTimeout(sec int, bin string, args ...string) (string, error) {
 	return buf.String(), err
 }
 
+var forgeGitMode bool
+
 func git(args ...string) error {
 	c := exec.Command("git", args...)
+	if forgeGitMode {
+		c = authenticatedGit(args)
+	}
 	c.Stdout, c.Stderr = os.Stderr, os.Stderr
-	c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	if c.Env == nil {
+		c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	}
 	return c.Run()
 }
 
@@ -61,6 +68,18 @@ func cmdSync(args []string) int {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "brain:", err)
 		return 1
+	}
+	if !*noPull && forgeActive(r) {
+		fc, e := readForge(r)
+		if e != nil || fc == nil {
+			return authError(fmt.Errorf("invalid Forge configuration"))
+		}
+		if _, e := currentAccess(fc.URL); e != nil {
+			return authError(e)
+		}
+		oldMode := forgeGitMode
+		forgeGitMode = true
+		defer func() { forgeGitMode = oldMode }()
 	}
 	if !*noPull {
 		if _, err := exec.LookPath("git"); err != nil {
@@ -142,6 +161,22 @@ func cmdCloneCell(args []string) int {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "brain:", err)
 		return 1
+	}
+	if forgeActive(r) {
+		fc, e := readForge(r)
+		if e != nil || fc == nil || !validForgeClone(fc.URL, url) {
+			return authError(fmt.Errorf("clone URL is outside the configured Forge origin"))
+		}
+		if _, e := currentAccess(fc.URL); e != nil {
+			return authError(e)
+		}
+		oldMode := forgeGitMode
+		forgeGitMode = true
+		defer func() { forgeGitMode = oldMode }()
+	} else if p, e := savedProfile(); e == nil && validForgeClone(p.ForgeURL, url) {
+		oldMode := forgeGitMode
+		forgeGitMode = true
+		defer func() { forgeGitMode = oldMode }()
 	}
 	target := filepath.Join(r, "workspaces", slug)
 	if exists(target) {

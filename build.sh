@@ -2,7 +2,7 @@
 # Cross-Compile: dist/brain_<version>_<os>_<arch>.(zip|tar.gz) + dist/SHA256SUMS
 set -euo pipefail
 cd "$(dirname "$0")"
-VERSION="${VERSION:-0.1.3}"
+VERSION="${VERSION:-0.2.0-rc.1}"
 TARGETS="windows/amd64 windows/arm64 darwin/amd64 darwin/arm64 linux/amd64 linux/arm64"
 rm -rf dist && mkdir -p dist
 for t in $TARGETS; do
@@ -12,13 +12,14 @@ for t in $TARGETS; do
   bin="brain"; [ "$os" = windows ] && bin="brain.exe"
   CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
     -ldflags "-s -w -X main.version=$VERSION" -o "$stage/$bin" .
-  cp README.md LICENSE "$stage/"
+  cp README.md LICENSE THIRD-PARTY.md CHANGELOG.md "$stage/"
+  cp -R docs "$stage/docs"
   if [ "$os" = windows ]; then
     (cd "$stage" && zip -qr "../../$name.zip" .)
   else
     tar -C "$stage" -czf "dist/$name.tar.gz" .
   fi
-  echo "gebaut: $name"
+  echo "built: $name"
 done
 rm -rf dist/.stage
 (cd dist && sha256sum brain_* > SHA256SUMS)
