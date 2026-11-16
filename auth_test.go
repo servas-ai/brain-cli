@@ -88,6 +88,48 @@ func TestAuthFreshStateDoesNotReadPAT(t *testing.T) {
 	}
 }
 
+func TestAuthStorageRejectsRepositoryConfigLocations(t *testing.T) {
+	for _, bare := range []bool{false, true} {
+		name := "worktree"
+		if bare {
+			name = "bare"
+		}
+		t.Run(name, func(t *testing.T) {
+			home, _ := isolatedGit(t)
+			args := []string{"init", "-q"}
+			if bare {
+				args = append(args, "--bare")
+			}
+			mustGit(t, append(args, home)...)
+			if err := writeAuthFile("session.json", map[string]string{"test": "synthetic"}); err == nil {
+				t.Fatal("repository accepted as authentication store")
+			}
+			config, err := os.UserConfigDir()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(config, "brain", "auth")); !os.IsNotExist(err) {
+				t.Fatal("unsafe store created before repository rejection")
+			}
+		})
+	}
+}
+
+func TestAuthStorageRejectsRepositoryCreatedAfterLogin(t *testing.T) {
+	home, _ := isolatedGit(t)
+	if err := writeAuthFile("session.json", map[string]string{"test": "synthetic"}); err != nil {
+		t.Fatal(err)
+	}
+	mustGit(t, "init", "-q", home)
+	var session map[string]string
+	if readAuthFile("session.json", &session) == nil {
+		t.Fatal("session read after config directory became a repository")
+	}
+	if err := writeAuthFile("session.json", map[string]string{"test": "replacement"}); err == nil {
+		t.Fatal("session updated inside a repository")
+	}
+}
+
 func TestForgeCloneURLBoundToOrigin(t *testing.T) {
 	for _, bad := range []string{"http://git.example.invalid/a.git", "https://other.invalid/a.git", "https://user:secret@git.example.invalid/a.git", "https://git.example.invalid/a.git?token=x", "file:///a", "-c x=y"} {
 		if validForgeClone("https://git.example.invalid", bad) {

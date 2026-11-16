@@ -17,6 +17,42 @@ import (
 
 const humanIssuer = "https://auth.servas.ai"
 
+// Reject existing repositories and symlinks before creating a store, and again
+// before opening it. A relocated OS config directory is not necessarily outside
+// a worktree; mode 0600 alone does not keep a session out of git add --all.
+func checkAuthDirectory(d string) error {
+	if !filepath.IsAbs(d) {
+		return errors.New("authentication directory must be absolute")
+	}
+	for p := filepath.Clean(d); ; p = filepath.Dir(p) {
+		st, err := os.Lstat(p)
+		if err != nil && !os.IsNotExist(err) || err == nil && st.Mode()&os.ModeSymlink != 0 {
+			return errors.New("unsafe authentication directory")
+		}
+		if strings.EqualFold(filepath.Base(p), ".git") {
+			return errors.New("authentication directory must be outside Git repositories")
+		}
+		if _, err := os.Lstat(filepath.Join(p, ".git")); err == nil {
+			return errors.New("authentication directory must be outside Git repositories")
+		} else if !os.IsNotExist(err) {
+			return errors.New("cannot inspect authentication directory")
+		}
+		// Bare repositories have no .git marker. Recognize their object store
+		// and HEAD without invoking Git or inheriting its environment/config.
+		objects, objectErr := os.Stat(filepath.Join(p, "objects"))
+		_, headErr := os.Lstat(filepath.Join(p, "HEAD"))
+		if objectErr == nil && objects.IsDir() && headErr == nil {
+			return errors.New("authentication directory must be outside Git repositories")
+		}
+		if objectErr != nil && !os.IsNotExist(objectErr) || headErr != nil && !os.IsNotExist(headErr) {
+			return errors.New("cannot inspect authentication directory")
+		}
+		if p == filepath.Dir(p) {
+			return nil
+		}
+	}
+}
+
 func authDir() (string, error) {
 	d, err := os.UserConfigDir()
 	if err != nil {
@@ -31,18 +67,14 @@ func authDir() (string, error) {
 			d = gitStore
 		}
 	}
+	if err := checkAuthDirectory(d); err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(d, 0700); err != nil {
 		return "", errors.New("cannot create authentication directory")
 	}
-	// Never traverse symlinks into a different token store.
-	for p := d; ; p = filepath.Dir(p) {
-		st, err := os.Lstat(p)
-		if err != nil || st.Mode()&os.ModeSymlink != 0 {
-			return "", errors.New("unsafe authentication directory")
-		}
-		if p == filepath.Dir(p) {
-			break
-		}
+	if err := checkAuthDirectory(d); err != nil {
+		return "", err
 	}
 	st, err := os.Stat(d)
 	if err != nil || !authPrivateMode(st) {

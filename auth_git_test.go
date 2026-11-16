@@ -158,3 +158,22 @@ func TestGitArgumentsRejectAuthenticationOverrides(t *testing.T) {
 		}
 	}
 }
+
+func TestGitCLIInvalidArgumentsExitTwo(t *testing.T) {
+	isolatedGit(t)
+	if cmdAuth([]string{"configure", "--url", "https://git.example.invalid", "--client-id", "synthetic-client", "--audience", "synthetic-resource"}) != 0 {
+		t.Fatal("synthetic public profile rejected")
+	}
+	for _, args := range [][]string{
+		{"--", "unsupported-command"},
+		{"--", "-c", "http.sslVerify=false", "fetch", "origin"},
+		{"--", "clone", "--template=/unused", "https://git.example.invalid/brain/demo.git"},
+	} {
+		if code := cmdGit(args); code != 2 {
+			t.Fatalf("invalid Git arguments returned %d, want 2", code)
+		}
+	}
+	if code := cmdGit([]string{"--", "status"}); code != 1 {
+		t.Fatalf("missing authentication returned %d, want 1", code)
+	}
+}

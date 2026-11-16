@@ -1,7 +1,9 @@
 # Changelog
 
-## 0.2.0-rc.7 — 2026-11-16
+## 0.2.0-rc.8 — 2026-11-16
 
+- Reject authentication stores inside existing worktrees/bare repositories before
+  creating or reading them; invalid wrapper arguments now return exit 2.
 - Replace Forge PAT stdin login and global credential-store writes with a pinned
   Zitadel browser/loopback PKCE client, private session storage and verified refresh.
 - Add isolated `brain git` commands and `brain propose` for the first PR; reject

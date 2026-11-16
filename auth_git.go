@@ -43,6 +43,8 @@ type authGitCommand struct {
 	cleanup          func()
 }
 
+type gitArgumentError struct{ error }
+
 func (c *authGitCommand) Run() error {
 	defer c.cleanup()
 	if c.preparationError != nil {
@@ -251,7 +253,7 @@ func authenticatedGit(args []string) *authGitCommand {
 	}
 	options, command, err := gitArguments(args, p.ForgeURL)
 	if err != nil {
-		return fail(err)
+		return fail(&gitArgumentError{err})
 	}
 	// Refuse any Git operation without a valid current OIDC session, even when
 	// the remote might accept a different ambient authentication mechanism.
@@ -281,7 +283,7 @@ func authenticatedGit(args []string) *authGitCommand {
 	}
 	args, err = boundGitNetworkArgs(args, options, command, env, p.ForgeURL)
 	if err != nil {
-		return fail(err)
+		return fail(&gitArgumentError{err})
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -310,6 +312,11 @@ func cmdGit(args []string) int {
 	c := authenticatedGit(args)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := c.Run(); err != nil {
+		var argumentError *gitArgumentError
+		if errors.As(err, &argumentError) {
+			fmt.Fprintln(os.Stderr, "brain git:", argumentError)
+			return 2
+		}
 		if e, ok := err.(*exec.ExitError); ok {
 			return e.ExitCode()
 		}

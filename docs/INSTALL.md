@@ -38,7 +38,7 @@ be reused merely because its ID is known.
 ## Obtain the client
 
 Use the archive and `SHA256SUMS` attached to the implementation issue. The
-candidate version is `0.2.0-rc.7`; it is not a signed clidist production release.
+candidate version is `0.2.0-rc.8`; it is not a signed clidist production release.
 All six OS/architecture archives are cross-built; Linux amd64 is exercised.
 Windows DPAPI and macOS runtime behavior need their native acceptance before
 claiming support for production Human login on those platforms.
@@ -48,7 +48,7 @@ Linux amd64 (macOS: use the matching darwin archive):
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
 # Require the selected archive's line to say OK; no missing/all-skipped result.
-tar -xzf brain_0.2.0-rc.7_linux_amd64.tar.gz
+tar -xzf brain_0.2.0-rc.8_linux_amd64.tar.gz
 install -d "$HOME/.local/bin"
 install -m 0755 brain "$HOME/.local/bin/brain"
 export PATH="$HOME/.local/bin:$PATH"
@@ -89,7 +89,10 @@ or browser-cookie extraction is supported. Status returns secret-free JSON
 
 Unix session/config files are atomically written to the OS user config
 location `brain/auth`, directory 0700/files 0600, outside all repositories.
-Symlinks and public token files are rejected. On Windows the session is encrypted
+Symlinks, public token files and config locations within existing Git worktrees
+or bare repositories are rejected before storing or reading credentials. Keep the
+OS config location outside repositories; do not initialize a repository around
+an existing credential directory. On Windows the session is encrypted
 for the current user with OS DPAPI; POSIX mode bits alone are not treated as
 confidentiality there. No portable app key is stored. Do not copy session files
 between users or systems. Changing profile identity/origin requires a new login.
@@ -191,7 +194,7 @@ export GOCACHE=/srv/test/pc-tool-verify/DKS-735/cache/go-build
 mkdir -p "$TMPDIR" "$GOPATH" "$GOCACHE"
 go test -race ./...
 go vet ./...
-VERSION=0.2.0-rc.7 ./build.sh
+VERSION=0.2.0-rc.8 ./build.sh
 ```
 
 Tests generate their own local TLS IdP, signing keys and identities. The Git
