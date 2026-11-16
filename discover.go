@@ -21,7 +21,7 @@ func discoverCells(root string) (added, gone []string) {
 			out, err = forgeCellLines(fc)
 		}
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "brain: Warnung: Workspaces nicht gefunden:", err)
+			fmt.Fprintln(os.Stderr, "brain: warning: workspace discovery failed:", err)
 			return nil, nil
 		}
 	} else {
@@ -95,9 +95,9 @@ func orgFromURL(u string) string {
 
 func reportDiscovery(added, gone []string) {
 	for _, a := range added {
-		fmt.Println("brain sync: neuer Workspace eingehängt: " + a)
+		fmt.Println("brain sync: new workspace mounted: " + a)
 	}
 	for _, g := range gone {
-		fmt.Println("brain sync: Workspace nicht mehr freigegeben (lokal belassen, bitte prüfen): " + g)
+		fmt.Println("brain sync: workspace access no longer granted (kept locally; please review): " + g)
 	}
 }

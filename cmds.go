@@ -24,7 +24,7 @@ func runTimeout(sec int, bin string, args ...string) (string, error) {
 	c.Stdout, c.Stderr = &buf, &buf
 	err := c.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		err = fmt.Errorf("Timeout nach %d s", sec)
+		err = fmt.Errorf("Timed out after %d s", sec)
 	}
 	return buf.String(), err
 }
@@ -49,18 +49,18 @@ func gitPull(dir, label string) {
 	}
 	fmt.Fprintf(os.Stderr, "brain: git pull --ff-only (%s)\n", label)
 	if err := git("-C", dir, "pull", "--ff-only"); err != nil {
-		fmt.Fprintf(os.Stderr, "brain: Warnung: pull in %s fehlgeschlagen (%v), arbeite mit lokalem Stand weiter\n", label, err)
+		fmt.Fprintf(os.Stderr, "brain: warning: pull in %s failed (%v); continuing with the local version\n", label, err)
 	}
 }
 
 func cmdSync(args []string) int {
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
-	root := fs.String("root", "", "Brain-Root")
-	noKat := fs.Bool("no-katalog", false, "keinen _katalog/ erzeugen (vorhandenen löschen)")
-	persp := fs.String("perspektive", "", "Markdown-Datei mit Angaben zu Logins")
-	noPull := fs.Bool("no-pull", false, "kein git pull")
-	noUpd := fs.Bool("no-update-check", false, "nicht nach neuen Versionen suchen")
-	noDisc := fs.Bool("no-discover", false, "keine neuen Workspaces suchen")
+	root := fs.String("root", "", "Brain root directory")
+	noKat := fs.Bool("no-katalog", false, "do not generate _katalog/ (remove any existing catalog)")
+	persp := fs.String("perspektive", "", "Markdown file with login information")
+	noPull := fs.Bool("no-pull", false, "skip git pull")
+	noUpd := fs.Bool("no-update-check", false, "do not check for new versions")
+	noDisc := fs.Bool("no-discover", false, "do not discover new workspaces")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -83,7 +83,7 @@ func cmdSync(args []string) int {
 	}
 	if !*noPull {
 		if _, err := exec.LookPath("git"); err != nil {
-			fmt.Fprintln(os.Stderr, "brain: Warnung: git nicht gefunden, überspringe pull")
+			fmt.Fprintln(os.Stderr, "brain: warning: git not found; skipping pull")
 		} else {
 			gitPull(r, ".")
 			if !*noDisc {
@@ -117,31 +117,31 @@ func cmdSync(args []string) int {
 		notices := updateNotices(r, false)
 		appendUpdatesToPerspektive(r, notices)
 		for _, n := range notices {
-			fmt.Println("brain sync: Update verfügbar: " + n)
+			fmt.Println("brain sync: update available: " + n)
 		}
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "brain:", err)
 		return 1
 	}
-	kein := ""
+	catalogPrefix := ""
 	if *noKat {
-		kein = "kein "
+		catalogPrefix = "no "
 	}
-	fmt.Printf("brain sync: %d _kinder.md, _workspaces.md, %s_katalog, _perspektive.md\n", n, kein)
+	fmt.Printf("brain sync: %d _kinder.md, _workspaces.md, %s_katalog, _perspektive.md\n", n, catalogPrefix)
 	return 0
 }
 
 func cmdCloneCell(args []string) int {
 	fs := flag.NewFlagSet("clone-cell", flag.ContinueOnError)
-	name := fs.String("name", "", "Slug des Workspaces")
-	root := fs.String("root", "", "Brain-Root")
+	name := fs.String("name", "", "Workspace slug")
+	root := fs.String("root", "", "Brain root directory")
 	fl, pos := splitArgs(args, map[string]bool{"name": true, "root": true})
 	if err := fs.Parse(fl); err != nil {
 		return 2
 	}
 	if len(pos) != 1 {
-		fmt.Fprintln(os.Stderr, "Aufruf: brain clone-cell <git-url> [--name <slug>]")
+		fmt.Fprintln(os.Stderr, "Usage: brain clone-cell <git-url> [--name <slug>]")
 		return 2
 	}
 	url := pos[0]
@@ -154,7 +154,7 @@ func cmdCloneCell(args []string) int {
 		slug = strings.TrimSuffix(u, ".git")
 	}
 	if slug == "" || strings.ContainsAny(slug, `/\`) || strings.HasPrefix(slug, ".") {
-		fmt.Fprintf(os.Stderr, "brain: ungültiger Slug %q\n", slug)
+		fmt.Fprintf(os.Stderr, "brain: invalid slug %q\n", slug)
 		return 2
 	}
 	r, err := findRoot(*root)
@@ -180,7 +180,7 @@ func cmdCloneCell(args []string) int {
 	}
 	target := filepath.Join(r, "workspaces", slug)
 	if exists(target) {
-		fmt.Fprintf(os.Stderr, "brain: %s existiert bereits\n", target)
+		fmt.Fprintf(os.Stderr, "brain: %s already exists\n", target)
 		return 1
 	}
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
@@ -194,11 +194,11 @@ func cmdCloneCell(args []string) int {
 	}
 	for _, s := range steps {
 		if err := git(s...); err != nil {
-			fmt.Fprintf(os.Stderr, "brain: git %s fehlgeschlagen: %v\n", strings.Join(s, " "), err)
+			fmt.Fprintf(os.Stderr, "brain: git %s failed: %v\n", strings.Join(s, " "), err)
 			return 1
 		}
 	}
-	fmt.Printf("brain: Zelle geklont nach workspaces/%s (ohne AGENTS.md, CLAUDE.md, .claude/, .codex/). Danach: brain sync\n", slug)
+	fmt.Printf("brain: cell cloned to workspaces/%s (excluding AGENTS.md, CLAUDE.md, .claude/, .codex/). Next: brain sync\n", slug)
 	return 0
 }
 
@@ -206,7 +206,7 @@ var requiredFields = []string{"id", "owner", "scope", "status", "summary", "evid
 
 func cmdCheck(args []string) int {
 	fs := flag.NewFlagSet("check", flag.ContinueOnError)
-	root := fs.String("root", "", "Brain-Root")
+	root := fs.String("root", "", "Brain root directory")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -225,20 +225,20 @@ func cmdCheck(args []string) int {
 		rel := relSlash(r, filepath.Join(dir, "README.md"))
 		fm, ok := frontmatter(filepath.Join(dir, "README.md"))
 		if !ok {
-			problems = append(problems, rel+": kein Frontmatter")
+			problems = append(problems, rel+": no frontmatter")
 		} else {
 			for _, f := range requiredFields {
 				v, has := fm[f]
 				if !has || (!v.isList && v.s == "") || (v.isList && len(v.l) == 0) {
-					problems = append(problems, fmt.Sprintf("%s: Pflichtfeld %s fehlt", rel, f))
+					problems = append(problems, fmt.Sprintf("%s: required field %s is missing", rel, f))
 				}
 			}
 			if fm.get("status") == "superseded" && fm.get("superseded_by") == "" {
-				problems = append(problems, rel+": status superseded ohne superseded_by")
+				problems = append(problems, rel+": status superseded without superseded_by")
 			}
 		}
 		if n := len(childNodes(dir)); n > 40 {
-			problems = append(problems, fmt.Sprintf("%s: %d Kind-Knoten (max. 40)", relSlash(r, dir), n))
+			problems = append(problems, fmt.Sprintf("%s: %d child nodes (maximum 40)", relSlash(r, dir), n))
 		}
 	})
 	var cells []string
@@ -260,7 +260,7 @@ func cmdCheck(args []string) int {
 				return filepath.SkipDir
 			}
 			if forbidden[d.Name()] {
-				problems = append(problems, relSlash(r, p)+": in Zellen nicht erlaubt")
+				problems = append(problems, relSlash(r, p)+": not allowed in cells")
 				if d.IsDir() {
 					return filepath.SkipDir
 				}
@@ -272,16 +272,16 @@ func cmdCheck(args []string) int {
 		fmt.Println(p)
 	}
 	if len(problems) > 0 {
-		fmt.Fprintf(os.Stderr, "brain check: %d Verstöße in %d Knoten\n", len(problems), nodes)
+		fmt.Fprintf(os.Stderr, "brain check: %d violations in %d nodes\n", len(problems), nodes)
 		return 1
 	}
-	fmt.Fprintf(os.Stderr, "brain check: ok (%d Knoten)\n", nodes)
+	fmt.Fprintf(os.Stderr, "brain check: ok (%d nodes)\n", nodes)
 	return 0
 }
 
 func cmdDoctor(args []string) int {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
-	root := fs.String("root", "", "Brain-Root")
+	root := fs.String("root", "", "Brain root directory")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -292,15 +292,15 @@ func cmdDoctor(args []string) int {
 	}
 	fails := 0
 	ok := func(m string) { fmt.Println("ok      " + m) }
-	warn := func(m string) { fmt.Println("WARNUNG " + m) }
-	fail := func(m string) { fmt.Println("FEHLER  " + m); fails++ }
+	warn := func(m string) { fmt.Println("WARNING " + m) }
+	fail := func(m string) { fmt.Println("ERROR   " + m); fails++ }
 
 	fmt.Println("Root: " + r)
 	if !isFile(filepath.Join(r, "AGENTS.md")) {
-		warn("keine AGENTS.md im Root gefunden")
+		warn("no AGENTS.md found in the root directory")
 	}
 	if _, err := exec.LookPath("git"); err != nil {
-		fail("git nicht im PATH")
+		fail("git not in PATH")
 	} else {
 		out, _ := runTimeout(10, "git", "--version")
 		ok(strings.TrimSpace(out))
@@ -309,26 +309,26 @@ func cmdDoctor(args []string) int {
 			if strings.TrimSpace(v) == "true" {
 				ok("git core.longpaths = true")
 			} else {
-				warn("git core.longpaths ist nicht true; setzen mit: git config --global core.longpaths true")
+				warn("git core.longpaths is not true; set it with: git config --global core.longpaths true")
 			}
 		}
 	}
 	if strings.Contains(strings.ToLower(r), "onedrive") {
-		warn("Root liegt in OneDrive; Sync-Konflikte mit Git möglich, besser z. B. C:\\brain")
+		warn("Root is in OneDrive; Git sync conflicts are possible; consider a directory such as C:\\brain")
 	} else {
-		ok("Root liegt nicht in OneDrive")
+		ok("Root is not in OneDrive")
 	}
 	for _, b := range []string{"qdrantcli", "sharepointcli"} {
 		if p, err := exec.LookPath(b); err != nil {
-			warn(b + " nicht im PATH")
+			warn(b + " not in PATH")
 		} else {
 			ok(b + ": " + p)
 		}
 	}
 	if isFile(filepath.Join(r, ".ignore")) {
-		ok(".ignore vorhanden")
+		ok(".ignore exists")
 	} else {
-		warn(".ignore fehlt (rg durchsucht sonst auch erzeugte Dateien)")
+		warn(".ignore is missing (rg will also search generated files)")
 	}
 	if fails > 0 {
 		return 1

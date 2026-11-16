@@ -145,12 +145,12 @@ func updateNotices(root string, force bool) []string {
 	latest := latestVersions(force)
 	var out []string
 	if lv, ok := latest["framework"]; ok {
-		local := "unbekannt (keine BRAIN_VERSION)"
+		local := "unknown (no BRAIN_VERSION)"
 		if b, err := os.ReadFile(filepath.Join(root, frameworkFile)); err == nil {
 			local = strings.TrimSpace(string(b))
 		}
-		if local == "unbekannt (keine BRAIN_VERSION)" || newer(lv, local) {
-			out = append(out, fmt.Sprintf("Framework (Vorlage %s): lokal %s, aktuell %s → Anleitung `public.brain.faq.framework-aktualisieren` bzw. https://github.com/%s/blob/main/public/brain/faq/framework-aktualisieren/README.md", templateRepo, local, lv, templateRepo))
+		if local == "unknown (no BRAIN_VERSION)" || newer(lv, local) {
+			out = append(out, fmt.Sprintf("Framework (template %s): local %s, latest %s → guide `public.brain.faq.framework-aktualisieren` or https://github.com/%s/blob/main/public/brain/faq/framework-aktualisieren/README.md", templateRepo, local, lv, templateRepo))
 		}
 	}
 	for _, t := range toolRepos {
@@ -163,7 +163,7 @@ func updateNotices(root string, force bool) []string {
 			continue
 		}
 		if newer(lv, local) {
-			out = append(out, fmt.Sprintf("%s: installiert %s, aktuell %s → Anleitung `public.brain.faq.tools-aktualisieren`", t.tool, local, lv))
+			out = append(out, fmt.Sprintf("%s: installed %s, latest %s → guide `public.brain.faq.tools-aktualisieren`", t.tool, local, lv))
 		}
 	}
 	return out
@@ -177,10 +177,10 @@ func appendUpdatesToPerspektive(root string, notices []string) {
 	}
 	defer f.Close()
 	if len(notices) == 0 {
-		fmt.Fprintf(f, "\n## Updates\n\nAlles aktuell (Stand %s).\n", time.Now().Format("2006-01-02"))
+		fmt.Fprintf(f, "\n## Updates\n\nEverything is up to date (checked %s).\n", time.Now().Format("2006-01-02"))
 		return
 	}
-	fmt.Fprintf(f, "\n## Updates verfügbar\n\nSag es deinem Menschen zu Beginn der Sitzung und biete an, das Update auszuführen:\n\n")
+	fmt.Fprintf(f, "\n## Updates available\n\nTell your human at the start of the session and offer to perform the update:\n\n")
 	for _, n := range notices {
 		fmt.Fprintf(f, "- %s\n", n)
 	}
@@ -192,16 +192,16 @@ func cmdUpdateCheck(args []string) int {
 		root = "."
 	}
 	if forgeActive(root) {
-		fmt.Println("brain update-check: aus (Forge-Brain, .brain/forge.yml)")
+		fmt.Println("brain update-check: disabled (Forge Brain, .brain/forge.yml)")
 		return 0
 	}
 	notices := updateNotices(root, true)
 	if len(notices) == 0 {
-		fmt.Println("brain update-check: alles aktuell")
+		fmt.Println("brain update-check: everything is up to date")
 		return 0
 	}
 	for _, n := range notices {
-		fmt.Println("Update verfügbar: " + n)
+		fmt.Println("Update available: " + n)
 	}
 	return 0
 }
