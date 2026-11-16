@@ -51,8 +51,8 @@ func validateProfile(p oidcProfile) error {
 	if strings.HasSuffix(p.Issuer, "/") {
 		return errors.New("invalid OIDC issuer")
 	}
-	if !oidcIdentifier(p.ClientID) || !oidcIdentifier(p.Audience) || strings.EqualFold(p.Audience, "zitadel") {
-		return errors.New("OIDC client and non-management audience identifiers are required")
+	if !oidcIdentifier(p.ClientID) || !oidcIdentifier(p.Audience) || strings.EqualFold(p.Audience, "zitadel") || p.ClientID == p.Audience {
+		return errors.New("OIDC distinct client and non-management audience identifiers are required")
 	}
 	if forge, err := oidcHTTPS(p.ForgeURL); err != nil || forge.Path != "" || forge.RawPath != "" {
 		return errors.New("invalid Forge URL")
@@ -269,12 +269,30 @@ func (p *oidcProvider) verify(ctx context.Context, raw, audience string) (*oidcC
 	return claims, nil
 }
 
+// ZITADEL ID tokens also carry project audiences and azp. Audience and a
+// legacy typ=JWT header alone therefore cannot distinguish access tokens.
+// Pin the documented JWT access-token claim shape in both validation paths.
+// https://zitadel.com/docs/apis/openidoauth/claims
+func (p *oidcProvider) verifyAccessToken(ctx context.Context, raw string) (*oidcClaims, error) {
+	claims, err := p.verify(ctx, raw, p.profile.Audience)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(claims.ID) == "" || claims.NotBefore == nil || claims.IssuedAt == nil ||
+		claims.AuthorizedParty != p.profile.ClientID || claims.Nonce != "" || claims.AccessHash != "" {
+		return nil, errors.New("OIDC access token validation failed")
+	}
+	// verify already validates nbf and iat against the current time. Require
+	// their presence here as well. The jti/nbf pair distinguishes standard ID tokens.
+	return claims, nil
+}
+
 func verifyAccess(ctx context.Context, p oidcProfile, raw string) (string, time.Time, error) {
 	provider, err := discoverOIDC(ctx, p)
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	claims, err := provider.verify(ctx, raw, p.Audience)
+	claims, err := provider.verifyAccessToken(ctx, raw)
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -320,7 +338,7 @@ func (p *oidcProvider) token(ctx context.Context, form url.Values) (*oidcTokenRe
 }
 
 func (p *oidcProvider) session(ctx context.Context, t *oidcTokenResponse, nonce, subject string, requireID bool) (*oidcSession, error) {
-	access, err := p.verify(ctx, t.AccessToken, p.profile.Audience)
+	access, err := p.verifyAccessToken(ctx, t.AccessToken)
 	if err != nil {
 		return nil, err
 	}

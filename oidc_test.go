@@ -73,7 +73,15 @@ func (f *oidcFixture) sign(issuer, audience, subject, nonce string, expired bool
 	if expired {
 		expiry = now.Add(-time.Minute)
 	}
-	claims := oidcClaims{RegisteredClaims: jwt.RegisteredClaims{Issuer: issuer, Audience: jwt.ClaimStrings{audience}, Subject: subject, ExpiresAt: jwt.NewNumericDate(expiry), IssuedAt: jwt.NewNumericDate(now.Add(-2 * time.Minute))}, Nonce: nonce}
+	claims := oidcClaims{RegisteredClaims: jwt.RegisteredClaims{Issuer: issuer, Audience: jwt.ClaimStrings{audience}, Subject: subject, ExpiresAt: jwt.NewNumericDate(expiry), IssuedAt: jwt.NewNumericDate(now.Add(-2 * time.Minute))}, Nonce: nonce, AuthorizedParty: f.profile.ClientID}
+	if audience == f.profile.Audience {
+		claims.ID = "tls-fixture-access-jti"
+		claims.NotBefore = jwt.NewNumericDate(now.Add(-2 * time.Minute))
+	}
+	return f.signClaims(claims)
+}
+
+func (f *oidcFixture) signClaims(claims oidcClaims) string {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = "fixture-key"
 	raw, err := token.SignedString(f.key)
@@ -486,7 +494,7 @@ func TestOIDCDiscoveryRedirectRejected(t *testing.T) {
 
 func TestOIDCProfileValidation(t *testing.T) {
 	f := newOIDCFixture(t)
-	for _, mode := range []string{"forge path", "forge slash", "missing scope", "management audience", "client whitespace", "audience control", "scope control"} {
+	for _, mode := range []string{"forge path", "forge slash", "missing scope", "management audience", "client whitespace", "audience control", "scope control", "same client and audience"} {
 		t.Run(mode, func(t *testing.T) {
 			p := f.profile
 			p.Scopes = append([]string(nil), p.Scopes...)
@@ -505,9 +513,85 @@ func TestOIDCProfileValidation(t *testing.T) {
 				p.Audience = "bad\x01"
 			case "scope control":
 				p.Scopes = append(p.Scopes, "bad\x01")
+			case "same client and audience":
+				p.ClientID = p.Audience
 			}
 			if err := validateProfile(p); err == nil {
 				t.Fatal("invalid profile accepted")
+			}
+		})
+	}
+}
+
+// ID-token substitution must fail even when ZITADEL includes the requested
+// project audience and the correct azp on a correctly signed, live ID token.
+func TestOIDCRejectsProjectAudienceIDTokenAsAccess(t *testing.T) {
+	f := newOIDCFixture(t)
+	now := time.Now()
+	for _, nonce := range []string{"fixture-id-nonce", ""} {
+		t.Run("nonce="+nonce, func(t *testing.T) {
+			idClaims := oidcClaims{RegisteredClaims: jwt.RegisteredClaims{Issuer: f.profile.Issuer, Subject: "fixture", Audience: jwt.ClaimStrings{f.profile.ClientID, f.profile.Audience}, IssuedAt: jwt.NewNumericDate(now.Add(-time.Minute)), ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour))}, AuthorizedParty: f.profile.ClientID, Nonce: nonce}
+			raw := f.signClaims(idClaims)
+			if _, _, err := verifyAccess(f.ctx, f.profile, raw); err == nil {
+				t.Fatal("ID token with project audience accepted as access token")
+			}
+			provider, err := discoverOIDC(f.ctx, f.profile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s, err := provider.session(f.ctx, &oidcTokenResponse{AccessToken: raw}, "", "fixture", false); err == nil || s != nil {
+				t.Fatal("refresh/session accepted ID token as access token")
+			}
+			// It remains a valid ID token with a multi-valued audience and exact azp.
+			access := f.sign(f.profile.Issuer, f.profile.Audience, "fixture", "", false)
+			if _, err := provider.session(f.ctx, &oidcTokenResponse{AccessToken: access, IDToken: raw}, nonce, "fixture", true); err != nil {
+				t.Fatal("normal ID-token validation changed", err)
+			}
+		})
+	}
+}
+
+func TestOIDCAccessClaimShape(t *testing.T) {
+	f := newOIDCFixture(t)
+	provider, err := discoverOIDC(f.ctx, f.profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"valid", "missing azp", "wrong azp", "missing jti", "blank jti", "missing nbf", "future nbf", "missing iat", "future iat", "nonce", "at_hash"} {
+		t.Run(mode, func(t *testing.T) {
+			now := time.Now()
+			claims := oidcClaims{RegisteredClaims: jwt.RegisteredClaims{Issuer: f.profile.Issuer, Subject: "fixture", Audience: jwt.ClaimStrings{f.profile.Audience}, ID: "tls-fixture-access-jti", NotBefore: jwt.NewNumericDate(now.Add(-time.Minute)), IssuedAt: jwt.NewNumericDate(now.Add(-time.Minute)), ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour))}, AuthorizedParty: f.profile.ClientID}
+			switch mode {
+			case "missing azp":
+				claims.AuthorizedParty = ""
+			case "wrong azp":
+				claims.AuthorizedParty = "other-client"
+			case "missing jti":
+				claims.ID = ""
+			case "blank jti":
+				claims.ID = " "
+			case "missing nbf":
+				claims.NotBefore = nil
+			case "future nbf":
+				claims.NotBefore = jwt.NewNumericDate(now.Add(time.Hour))
+			case "missing iat":
+				claims.IssuedAt = nil
+			case "future iat":
+				claims.IssuedAt = jwt.NewNumericDate(now.Add(time.Hour))
+			case "nonce":
+				claims.Nonce = "id-token-nonce"
+			case "at_hash":
+				claims.AccessHash = "id-token-hash"
+			}
+			raw := f.signClaims(claims)
+			_, _, verifyErr := verifyAccess(f.ctx, f.profile, raw)
+			session, sessionErr := provider.session(f.ctx, &oidcTokenResponse{AccessToken: raw}, "", "fixture", false)
+			if mode == "valid" {
+				if verifyErr != nil || sessionErr != nil || session == nil {
+					t.Fatal("valid access claims rejected", verifyErr, sessionErr)
+				}
+			} else if verifyErr == nil || sessionErr == nil || session != nil {
+				t.Fatal("invalid access claim shape accepted")
 			}
 		})
 	}
