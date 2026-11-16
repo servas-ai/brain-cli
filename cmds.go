@@ -32,12 +32,13 @@ func runTimeout(sec int, bin string, args ...string) (string, error) {
 var forgeGitMode bool
 
 func git(args ...string) error {
-	if forgeGitMode {
+	if forgeGitMode || brainGitNeedsOIDC(args) {
 		c := authenticatedGit(args)
 		c.Stdout, c.Stderr = os.Stderr, os.Stderr
 		return c.Run()
 	}
-	c := exec.Command("git", args...)
+	// The GitHub exception must not follow a redirect into a Forge origin.
+	c := exec.Command("git", append([]string{"-c", "http.followRedirects=false"}, args...)...)
 	c.Stdout, c.Stderr = os.Stderr, os.Stderr
 	c.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	return c.Run()
@@ -85,6 +86,19 @@ func cmdSync(args []string) int {
 		if _, err := exec.LookPath("git"); err != nil {
 			fmt.Fprintln(os.Stderr, "brain: warning: git not found; skipping pull")
 		} else {
+			// Check every existing repository before the first network request.
+			// Removing forge.yml must not enable ambient credentials for a Forge.
+			dirs := []string{r, filepath.Join(r, "personal")}
+			for _, n := range listNames(filepath.Join(r, "workspaces")) {
+				dirs = append(dirs, filepath.Join(r, "workspaces", n))
+			}
+			for _, dir := range dirs {
+				if exists(filepath.Join(dir, ".git")) {
+					if err := preflightBrainGit([]string{"-C", dir, "pull", "--ff-only"}); err != nil {
+						return authError(err)
+					}
+				}
+			}
 			gitPull(r, ".")
 			if !*noDisc {
 				reportDiscovery(discoverCells(r))
@@ -177,6 +191,9 @@ func cmdCloneCell(args []string) int {
 		oldMode := forgeGitMode
 		forgeGitMode = true
 		defer func() { forgeGitMode = oldMode }()
+	}
+	if err := preflightBrainGit([]string{"clone", "--no-checkout", url}); err != nil {
+		return authError(err)
 	}
 	target := filepath.Join(r, "workspaces", slug)
 	if exists(target) {

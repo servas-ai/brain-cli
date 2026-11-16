@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,12 +84,18 @@ func githubCellLines(root string) (string, bool) {
 }
 
 func orgFromURL(u string) string {
-	u = strings.TrimSuffix(u, ".git")
-	if i := strings.Index(u, "github.com"); i >= 0 {
-		rest := strings.TrimLeft(u[i+len("github.com"):], ":/")
-		if j := strings.Index(rest, "/"); j > 0 {
-			return rest[:j]
-		}
+	// Keep recognizing existing GitHub metadata, without accepting hosts
+	// which merely contain the text github.com.
+	if strings.HasPrefix(u, "git@github.com:") {
+		u = "https://github.com/" + strings.TrimPrefix(u, "git@github.com:")
+	}
+	if !githubHTTPS(u) {
+		return ""
+	}
+	parsed, _ := url.Parse(u)
+	parts := strings.Split(strings.TrimPrefix(parsed.Path, "/"), "/")
+	if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+		return parts[0]
 	}
 	return ""
 }

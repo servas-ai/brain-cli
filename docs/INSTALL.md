@@ -36,7 +36,7 @@ be reused merely because its ID is known.
 ## Obtain the client
 
 Use the archive and `SHA256SUMS` attached to the implementation issue. The
-candidate version is `0.2.0-rc.2`; it is not a signed clidist production release.
+candidate version is `0.2.0-rc.3`; it is not a signed clidist production release.
 All six OS/architecture archives are cross-built; Linux amd64 is exercised.
 Windows DPAPI and macOS runtime behavior need their native acceptance before
 claiming support for production Human login on those platforms.
@@ -46,7 +46,7 @@ Linux amd64 (macOS: use the matching darwin archive):
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
 # Require the selected archive's line to say OK; no missing/all-skipped result.
-tar -xzf brain_0.2.0-rc.2_linux_amd64.tar.gz
+tar -xzf brain_0.2.0-rc.3_linux_amd64.tar.gz
 install -d "$HOME/.local/bin"
 install -m 0755 brain "$HOME/.local/bin/brain"
 export PATH="$HOME/.local/bin:$PATH"
@@ -137,7 +137,12 @@ org: brain
 `brain sync` uses the verified OIDC session for Forge discovery and network Git;
 returned clone URLs must remain on the configured origin. Failed authentication
 aborts a Forge sync before any pull, without falling back to a stored PAT.
-GitHub brains continue to use the pre-existing GitHub path.
+HTTPS GitHub brains continue to use the pre-existing GitHub credential path,
+with redirects disabled. Every other remote requires the isolated OIDC worker,
+even if `.brain/forge.yml` is missing or the saved profile is absent or invalid.
+`sync` checks the root, workspaces and personal remotes before its first pull;
+Git URL rewrites outside GitHub cannot opt into the GitHub exception. Legacy
+SSH and local-file network workflows are not accepted by these commands.
 
 ## Refresh, logout and failures
 
@@ -173,7 +178,7 @@ export GOCACHE=/srv/test/pc-tool-verify/DKS-735/cache/go-build
 mkdir -p "$TMPDIR" "$GOPATH" "$GOCACHE"
 go test -race ./...
 go vet ./...
-VERSION=0.2.0-rc.2 ./build.sh
+VERSION=0.2.0-rc.3 ./build.sh
 ```
 
 Tests generate their own local TLS IdP, signing keys and identities. The Git

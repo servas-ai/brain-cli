@@ -199,6 +199,18 @@ func TestGitOIDCCloneFetchPushAndProposalTLS(t *testing.T) {
 	run("-C", work, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "First proposal")
 	run("-C", work, "push", "-u", "origin", "proposal/first-change")
 	run("-C", work, "fetch", "origin")
+	// Legacy commands without forge.yml still use the verified session.
+	if err := git("-C", work, "pull", "--ff-only"); err != nil {
+		t.Fatalf("OIDC pull without Forge marker failed: %v", err)
+	}
+	mustGit(t, "--git-dir="+bare, "symbolic-ref", "HEAD", "refs/heads/proposal/first-change")
+	cellRoot := t.TempDir()
+	if cmdCloneCell([]string{"--root", cellRoot, forge.URL + "/brain/demo.git"}) != 0 {
+		t.Fatal("OIDC clone-cell without Forge marker failed")
+	}
+	if !exists(filepath.Join(cellRoot, "workspaces", "demo", "README.md")) {
+		t.Fatal("OIDC clone-cell did not check out the proposal")
+	}
 	oldHTTP := forgeHTTP
 	forgeHTTP = forge.Client()
 	forgeHTTP.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
