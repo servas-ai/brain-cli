@@ -206,20 +206,20 @@ func cmdAuth(args []string) int {
 		if len(args) != 1 {
 			return 2
 		}
-		p, err := savedProfile()
-		if err != nil {
-			return authError(err)
-		}
 		var s oidcSession
 		if err := readAuthFile("session.json", &s); err != nil {
 			return authError(err)
 		}
-		if !matchingSession(p, &s) {
-			return authError(errors.New("profile mismatch; local session retained for revocation"))
-		}
+		// Revoke the original session even after the public profile was changed.
+		// validateProfile below still enforces the fixed issuer and safe endpoints.
+		p := oidcProfile{Issuer: s.Issuer, ClientID: s.ClientID, Audience: s.Audience, ForgeURL: s.ForgeURL,
+			Scopes: []string{"openid", "offline_access", "urn:zitadel:iam:org:project:id:" + s.Audience + ":aud"}}
 		ctx, cancel := authContext()
 		defer cancel()
-		revokeErr := revokeOIDC(ctx, p, &s)
+		revokeErr := validateProfile(p)
+		if revokeErr == nil {
+			revokeErr = revokeOIDC(ctx, p, &s)
+		}
 		d, err := authDir()
 		if err != nil {
 			return authError(err)

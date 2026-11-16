@@ -258,3 +258,33 @@ func TestGitEnvironmentDoesNotEnableCredentialTracing(t *testing.T) {
 		}
 	}
 }
+
+func TestLogoutRevokesOriginalSessionAfterProfileChange(t *testing.T) {
+	isolatedGit(t)
+	f := newOIDCFixture(t)
+	old := http.DefaultTransport
+	http.DefaultTransport = f.server.Client().Transport
+	defer func() { http.DefaultTransport = old }()
+	s, err := loginOIDC(f.ctx, f.profile, f.browser(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeAuthFile("session.json", s); err != nil {
+		t.Fatal(err)
+	}
+	p := f.profile
+	p.ClientID = "another-client"
+	if err := writeAuthFile("profile.json", p); err != nil {
+		t.Fatal(err)
+	}
+	if cmdAuth([]string{"logout"}) != 0 {
+		t.Fatal("logout after profile change failed")
+	}
+	if len(f.revoked) != 2 {
+		t.Fatal("original tokens not revoked")
+	}
+	var loaded oidcSession
+	if readAuthFile("session.json", &loaded) == nil {
+		t.Fatal("session remains after logout")
+	}
+}
