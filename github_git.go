@@ -67,6 +67,10 @@ func githubGit(args []string) *authGitCommand {
 		at := len(options) + 1
 		safeArgs = append(append(append([]string{}, args[:at]...), "--template="+filepath.Join(processHome, "template")), args[at:]...)
 	}
+	safeArgs, err = boundGitNetworkArgs(safeArgs, options, command, env, "https://github.com")
+	if err != nil {
+		return fail(err)
+	}
 	helper := "!env HOME=" + gitShellWord(filepath.ToSlash(home)) + " XDG_CONFIG_HOME=" + gitShellWord(filepath.ToSlash(xdg)) + " GH_CONFIG_DIR=" + gitShellWord(filepath.ToSlash(ghConfig)) + " " + gitShellWord(filepath.ToSlash(gh)) + " auth git-credential"
 	prefix := []string{"--no-pager", "-c", "credential.helper=", "-c", "credential.helper=" + helper, "-c", "credential.useHttpPath=true", "-c", "http.followRedirects=false", "-c", "http.sslVerify=true", "-c", "http.extraHeader=", "-c", "http.saveCookies=false", "-c", "http.emptyAuth=false", "-c", "http.delegation=none", "-c", "core.hooksPath=" + filepath.Join(processHome, "hooks"), "-c", "fetch.recurseSubmodules=false", "-c", "submodule.recurse=false", "-c", "push.recurseSubmodules=no"}
 	c.Cmd = exec.Command("git", append(prefix, safeArgs...)...)

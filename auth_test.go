@@ -212,6 +212,39 @@ func TestGitOIDCCloneFetchPushAndProposalTLS(t *testing.T) {
 		mustGit(t, "-C", work, "config", "--unset", key)
 	}
 	mustGit(t, "-C", work, "config", "branch.proposal/first-change.remote", "origin")
+
+	for _, legacy := range []string{"remotes", "branches"} {
+		dir := filepath.Join(work, ".git", legacy)
+		os.Mkdir(dir, 0700)
+		file := filepath.Join(dir, "hidden")
+		os.WriteFile(file, []byte("URL: https://foreign.invalid/a.git\n"), 0600)
+		c := authenticatedGit([]string{"-C", work, "fetch", "hidden"})
+		if c.preparationError == nil {
+			c.cleanup()
+			t.Fatal("legacy remote metadata passed preflight")
+		}
+		c.cleanup()
+		os.Remove(file)
+		os.Remove(dir)
+	}
+	for _, key := range []string{"remotes.hidden", "fetch.bundleURI"} {
+		mustGit(t, "-C", work, "config", key, "https://foreign.invalid/a.git")
+		c := authenticatedGit([]string{"-C", work, "fetch", "origin"})
+		if c.preparationError == nil {
+			c.cleanup()
+			t.Fatal("indirect remote configuration passed preflight")
+		}
+		c.cleanup()
+		mustGit(t, "-C", work, "config", "--unset", key)
+	}
+	for _, argv := range [][]string{{"fetch", "hidden"}, {"push", "hidden", "HEAD:main"}, {"fetch", "--multiple", "origin"}, {"push", "--repo=https://foreign.invalid/a.git"}} {
+		c := authenticatedGit(append([]string{"-C", work}, argv...))
+		if c.preparationError == nil {
+			c.cleanup()
+			t.Fatal("uninspected network destination passed preflight")
+		}
+		c.cleanup()
+	}
 	// Legacy commands without forge.yml still use the verified session.
 	if err := git("-C", work, "pull", "--ff-only"); err != nil {
 		t.Fatalf("OIDC pull without Forge marker failed: %v", err)

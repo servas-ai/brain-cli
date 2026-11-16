@@ -189,6 +189,18 @@ func checkGitLocalConfig(options, env []string, origin string) error {
 	if probe.Run() != nil {
 		return nil
 	} // clone from outside a repository
+	common := exec.Command("git", append(append([]string{}, options...), "rev-parse", "--path-format=absolute", "--git-common-dir")...)
+	common.Env = env
+	dir, err := common.Output()
+	if err != nil {
+		return errors.New("cannot inspect Git repository metadata")
+	}
+	for _, name := range []string{"remotes", "branches"} {
+		entries, err := os.ReadDir(filepath.Join(strings.TrimSpace(string(dir)), name))
+		if !os.IsNotExist(err) && (err != nil || len(entries) != 0) {
+			return errors.New("legacy Git remote files are unsupported; use inspected configuration remotes")
+		}
+	}
 	c := exec.Command("git", append(append([]string{}, options...), "config", "--includes", "--null", "--list")...)
 	c.Env = env
 	out, err := c.Output()
@@ -200,6 +212,9 @@ func checkGitLocalConfig(options, env []string, origin string) error {
 	for _, entry := range strings.Split(string(out), "\x00") {
 		key, value, _ := strings.Cut(entry, "\n")
 		key = strings.ToLower(key)
+		if strings.HasPrefix(key, "remotes.") || key == "fetch.bundleuri" || strings.HasPrefix(key, "bundle.") {
+			return errors.New("indirect Git remote groups and bundle transports are unsupported")
+		}
 		if strings.HasPrefix(key, "branch.") && (strings.HasSuffix(key, ".remote") || strings.HasSuffix(key, ".pushremote")) || key == "remote.pushdefault" {
 			upstreams = append(upstreams, value)
 		}
@@ -263,6 +278,10 @@ func authenticatedGit(args []string) *authGitCommand {
 		if err := checkGitLocalConfig(options, env, p.ForgeURL); err != nil {
 			return fail(err)
 		}
+	}
+	args, err = boundGitNetworkArgs(args, options, command, env, p.ForgeURL)
+	if err != nil {
+		return fail(err)
 	}
 	exe, err := os.Executable()
 	if err != nil {
