@@ -9,7 +9,7 @@ import (
 // Network commands accept only the documented option set and one explicit
 // HTTPS URL or configuration-backed remote. Git's legacy files/groups and
 // implicit destination heuristics must never select another authority.
-func boundGitNetworkArgs(args, options []string, command string, env []string, origin string) ([]string, error) {
+func gitNetworkSyntax(args, options []string, command string) ([]string, []string, bool, error) {
 	allowed := map[string]map[string]bool{
 		"fetch":     {"--prune": true, "--tags": true, "--no-tags": true, "--quiet": true, "-q": true},
 		"pull":      {"--ff-only": true, "--quiet": true, "-q": true},
@@ -18,23 +18,43 @@ func boundGitNetworkArgs(args, options []string, command string, env []string, o
 	}
 	flags, network := allowed[command]
 	if !network {
-		return args, nil
+		return nil, nil, false, nil
 	}
 	invalid := errors.New("network Git requires a documented option and an inspected named remote or configured HTTPS URL")
 	var opts, positional []string
 	for _, a := range args[len(options)+1:] {
 		if strings.HasPrefix(a, "-") {
 			if !flags[a] {
-				return nil, invalid
+				return nil, nil, true, invalid
 			}
 			opts = append(opts, a)
 		} else {
 			if strings.ContainsAny(a, "\r\n\x00") {
-				return nil, invalid
+				return nil, nil, true, invalid
 			}
 			positional = append(positional, a)
 		}
 	}
+	if len(positional) == 0 && command != "pull" {
+		return nil, nil, true, invalid
+	}
+	for i, ref := range positional {
+		if i > 0 && strings.Contains(ref, "://") {
+			return nil, nil, true, invalid
+		}
+	}
+	return opts, positional, true, nil
+}
+
+func boundGitNetworkArgs(args, options []string, command string, env []string, origin string) ([]string, error) {
+	opts, positional, network, err := gitNetworkSyntax(args, options, command)
+	if err != nil {
+		return nil, err
+	}
+	if !network {
+		return args, nil
+	}
+	invalid := errors.New("network Git requires a documented option and an inspected named remote or configured HTTPS URL")
 	probe := func(key string) ([]byte, error) {
 		c := exec.Command("git", append(append([]string{}, options...), "config", "--get-all", key)...)
 		c.Env = env
@@ -66,11 +86,6 @@ func boundGitNetworkArgs(args, options []string, command string, env []string, o
 			if !validForgeClone(origin, raw) {
 				return nil, invalid
 			}
-		}
-	}
-	for _, ref := range positional[1:] {
-		if strings.Contains(ref, "://") {
-			return nil, invalid
 		}
 	}
 	out := append(append([]string{}, options...), command)

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,6 +45,19 @@ type authGitCommand struct {
 }
 
 type gitArgumentError struct{ error }
+
+func validGitArgumentURL(origin, raw string) bool {
+	if origin == "" {
+		// Syntax can be checked before a profile exists. Origin authorization
+		// still happens again with the saved profile before authentication.
+		u, err := url.Parse(raw)
+		if err != nil || u.Host == "" {
+			return false
+		}
+		origin = "https://" + u.Host
+	}
+	return validForgeClone(origin, raw)
+}
 
 func (c *authGitCommand) Run() error {
 	defer c.cleanup()
@@ -125,9 +139,12 @@ func gitArguments(args []string, origin string) ([]string, string, error) {
 		if (a == "-c" && command == "clone") || strings.HasPrefix(a, "--config") || a == "--global" || a == "--system" || a == "--file" || a == "-f" && command == "config" {
 			return nil, "", invalid
 		}
-		if strings.Contains(a, "://") && !validForgeClone(origin, a) {
+		if strings.Contains(a, "://") && !validGitArgumentURL(origin, a) {
 			return nil, "", errors.New("Git URL is outside the configured HTTPS Forge origin")
 		}
+	}
+	if _, _, _, err := gitNetworkSyntax(args, options, command); err != nil {
+		return nil, "", err
 	}
 	return options, command, nil
 }
@@ -174,7 +191,7 @@ func gitCloneArguments(args []string, origin string) error {
 			}
 			continue
 		}
-		if positional == 0 && !validForgeClone(origin, a) {
+		if positional == 0 && !validGitArgumentURL(origin, a) {
 			return errors.New("clone requires a repository on the configured HTTPS Forge origin")
 		}
 		positional++
@@ -247,6 +264,9 @@ func checkGitLocalConfig(options, env []string, origin string) error {
 func authenticatedGit(args []string) *authGitCommand {
 	c := &authGitCommand{Cmd: exec.Command("git"), cleanup: func() {}}
 	fail := func(err error) *authGitCommand { c.preparationError = err; return c }
+	if _, _, err := gitArguments(args, ""); err != nil {
+		return fail(&gitArgumentError{err})
+	}
 	p, err := savedProfile()
 	if err != nil {
 		return fail(err)
