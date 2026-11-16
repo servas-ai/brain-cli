@@ -195,9 +195,14 @@ func checkGitLocalConfig(options, env []string, origin string) error {
 	if err != nil {
 		return errors.New("cannot inspect local Git authentication configuration")
 	}
+	remotes := map[string]bool{}
+	var upstreams []string
 	for _, entry := range strings.Split(string(out), "\x00") {
 		key, value, _ := strings.Cut(entry, "\n")
 		key = strings.ToLower(key)
+		if strings.HasPrefix(key, "branch.") && (strings.HasSuffix(key, ".remote") || strings.HasSuffix(key, ".pushremote")) || key == "remote.pushdefault" {
+			upstreams = append(upstreams, value)
+		}
 		if strings.HasPrefix(key, "http.") || strings.HasPrefix(key, "credential.") || strings.HasPrefix(key, "url.") || key == "core.askpass" || key == "core.sshcommand" || key == "core.gitproxy" {
 			return errors.New("local Git HTTP/credential overrides are not allowed; use OS trust or GIT_SSL_CAINFO for the CA")
 		}
@@ -206,9 +211,17 @@ func checkGitLocalConfig(options, env []string, origin string) error {
 				if !validForgeClone(origin, value) {
 					return errors.New("repository remote is outside the configured HTTPS Forge origin")
 				}
+				name := strings.TrimPrefix(key, "remote.")
+				name = strings.TrimSuffix(strings.TrimSuffix(name, ".pushurl"), ".url")
+				remotes[name] = true
 			} else if strings.HasSuffix(key, ".proxy") || strings.HasSuffix(key, ".uploadpack") || strings.HasSuffix(key, ".receivepack") || strings.HasSuffix(key, ".vcs") {
 				return errors.New("local Git remote transport overrides are not allowed")
 			}
+		}
+	}
+	for _, upstream := range upstreams {
+		if upstream != "." && !remotes[strings.ToLower(upstream)] {
+			return errors.New("Git upstream must name an inspected remote, not a direct URL")
 		}
 	}
 	return nil

@@ -199,6 +199,19 @@ func TestGitOIDCCloneFetchPushAndProposalTLS(t *testing.T) {
 	run("-C", work, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "First proposal")
 	run("-C", work, "push", "-u", "origin", "proposal/first-change")
 	run("-C", work, "fetch", "origin")
+
+	// A branch/default-push URL must not bypass the inspected named remotes.
+	for _, key := range []string{"branch.proposal/first-change.remote", "branch.proposal/first-change.pushRemote", "remote.pushDefault"} {
+		mustGit(t, "-C", work, "config", key, "https://foreign.invalid/brain/foreign.git")
+		c := authenticatedGit([]string{"-C", work, "pull", "--ff-only"})
+		if c.preparationError == nil {
+			c.cleanup()
+			t.Fatal("direct upstream URL passed preflight")
+		}
+		c.cleanup()
+		mustGit(t, "-C", work, "config", "--unset", key)
+	}
+	mustGit(t, "-C", work, "config", "branch.proposal/first-change.remote", "origin")
 	// Legacy commands without forge.yml still use the verified session.
 	if err := git("-C", work, "pull", "--ff-only"); err != nil {
 		t.Fatalf("OIDC pull without Forge marker failed: %v", err)

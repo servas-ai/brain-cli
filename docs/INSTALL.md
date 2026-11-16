@@ -38,7 +38,7 @@ be reused merely because its ID is known.
 ## Obtain the client
 
 Use the archive and `SHA256SUMS` attached to the implementation issue. The
-candidate version is `0.2.0-rc.5`; it is not a signed clidist production release.
+candidate version is `0.2.0-rc.6`; it is not a signed clidist production release.
 All six OS/architecture archives are cross-built; Linux amd64 is exercised.
 Windows DPAPI and macOS runtime behavior need their native acceptance before
 claiming support for production Human login on those platforms.
@@ -48,7 +48,7 @@ Linux amd64 (macOS: use the matching darwin archive):
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
 # Require the selected archive's line to say OK; no missing/all-skipped result.
-tar -xzf brain_0.2.0-rc.5_linux_amd64.tar.gz
+tar -xzf brain_0.2.0-rc.6_linux_amd64.tar.gz
 install -d "$HOME/.local/bin"
 install -m 0755 brain "$HOME/.local/bin/brain"
 export PATH="$HOME/.local/bin:$PATH"
@@ -118,6 +118,8 @@ OIDC session, isolates ambient Git config/cookies/.netrc/client certificates,
 disables redirects and credential traces, and passes the access token through
 Git's internal credential pipe only to the configured HTTPS origin. Repository
 HTTP/credential overrides and remote URLs outside that origin are rejected.
+Branch and default-push upstreams must name an inspected remote; direct upstream
+URLs are rejected before contacting even an unauthenticated foreign server.
 Use the OS trust store or `GIT_SSL_CAINFO` for a private CA. The wrapper supports
 the documented Git workflow and common local commands; arbitrary Git aliases
 and authentication overrides are not supported. Clone accepts the normal HTTPS
@@ -185,7 +187,7 @@ export GOCACHE=/srv/test/pc-tool-verify/DKS-735/cache/go-build
 mkdir -p "$TMPDIR" "$GOPATH" "$GOCACHE"
 go test -race ./...
 go vet ./...
-VERSION=0.2.0-rc.5 ./build.sh
+VERSION=0.2.0-rc.6 ./build.sh
 ```
 
 Tests generate their own local TLS IdP, signing keys and identities. The Git
