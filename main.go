@@ -19,6 +19,7 @@ Usage:
   brain doctor [--root <dir>]
   brain hook stop|compact
   brain update-check
+  brain self-update [login|status|check|rollback|enable|disable|logout]
   brain auth configure|status|logout
   brain login [--url <forge-origin>] [--root <dir>]
   brain git -- <git arguments>
@@ -49,7 +50,7 @@ func main() {
 	case "doctor":
 		code = cmdDoctor(args)
 	case "hook":
-		os.Exit(cmdHook(os.Args[2:]))
+		code = cmdHook(args)
 	case "login":
 		code = cmdLogin(args)
 	case "auth":
@@ -63,7 +64,9 @@ func main() {
 	case "guide":
 		fmt.Print(authGuide)
 	case "update-check":
-		os.Exit(cmdUpdateCheck(os.Args[2:]))
+		code = cmdUpdateCheck(args)
+	case "self-update":
+		code = cmdSelfUpdate(args)
 	case "version", "--version", "-v":
 		fmt.Println("brain " + version)
 	case "help", "--help", "-h":
@@ -71,6 +74,9 @@ func main() {
 	default:
 		fmt.Fprintf(os.Stderr, "brain: unknown command %q\n\n%s", cmd, usage)
 		code = 2
+	}
+	if cmd != "git-credential" && cmd != "self-update" {
+		maybeBackgroundUpdate()
 	}
 	os.Exit(code)
 }

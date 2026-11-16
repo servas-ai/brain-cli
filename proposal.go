@@ -121,4 +121,6 @@ new browser login. Status prints secret-free JSON. Exit codes: 0 success,
 Never pass tokens on stdin/argv or use Git credential store as a workaround.
 Issuer is fixed to https://auth.servas.ai. Pocket-ID browser login is separate.
 See docs/INSTALL.md and docs/OIDC-CONTRACT.md for activation prerequisites.
+Signed updates: brain self-update status. This unsigned candidate is gated;
+read docs/SELF-UPDATE.md before any approved stable update login or publication.
 `

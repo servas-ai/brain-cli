@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0-rc.1 — 2026-11-16
+## 0.2.0-rc.2 — 2026-11-16
 
 - Replace Forge PAT stdin login and global credential-store writes with a pinned
   Zitadel browser/loopback PKCE client, private session storage and verified refresh.
@@ -9,5 +9,8 @@
 - Add explicit API/Git adapter contract and installation instructions. Existing
   KIRA Pocket-ID browser login remains separate. No client/grant/adapter activation.
 - Add local synthetic TLS IdP and real Git HTTP fixture coverage.
+- Add a gated signed clidist updater with a separate Human session, version-bound
+  checksums, Linux atomic replacement and verified rollback. No live publication;
+  Windows replacement remains open. Convert legacy CLI output/guidance to English.
 - Windows session encryption uses current-user DPAPI; native Windows/macOS login
   acceptance and live Zitadel/KIRA acceptance remain open.

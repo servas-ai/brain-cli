@@ -36,7 +36,7 @@ be reused merely because its ID is known.
 ## Obtain the client
 
 Use the archive and `SHA256SUMS` attached to the implementation issue. The
-candidate version is `0.2.0-rc.1`; it is not a signed clidist production release.
+candidate version is `0.2.0-rc.2`; it is not a signed clidist production release.
 All six OS/architecture archives are cross-built; Linux amd64 is exercised.
 Windows DPAPI and macOS runtime behavior need their native acceptance before
 claiming support for production Human login on those platforms.
@@ -46,7 +46,7 @@ Linux amd64 (macOS: use the matching darwin archive):
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
 # Require the selected archive's line to say OK; no missing/all-skipped result.
-tar -xzf brain_0.2.0-rc.1_linux_amd64.tar.gz
+tar -xzf brain_0.2.0-rc.2_linux_amd64.tar.gz
 install -d "$HOME/.local/bin"
 install -m 0755 brain "$HOME/.local/bin/brain"
 export PATH="$HOME/.local/bin:$PATH"
@@ -173,7 +173,7 @@ export GOCACHE=/srv/test/pc-tool-verify/DKS-735/cache/go-build
 mkdir -p "$TMPDIR" "$GOPATH" "$GOCACHE"
 go test -race ./...
 go vet ./...
-VERSION=0.2.0-rc.1 ./build.sh
+VERSION=0.2.0-rc.2 ./build.sh
 ```
 
 Tests generate their own local TLS IdP, signing keys and identities. The Git
