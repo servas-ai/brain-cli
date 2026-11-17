@@ -14,6 +14,8 @@ Betriebssysteme: Windows 10/11, macOS 12+, Linux (amd64/arm64). Keine weiteren L
 
 ## Installation
 
+Human-OIDC-Kandidat: [docs/INSTALL.md](docs/INSTALL.md). Noch keine Live-Aktivierung; [konkreter KIRA-Vertrag](docs/OIDC-CONTRACT.md).
+
 Vorgebaute Binaries: https://github.com/servas-ai/brain-cli/releases/latest (`brain_<os>_<arch>.zip` bzw. `.tar.gz`, Prüfsummen in `SHA256SUMS`). In einen Ordner im `PATH` legen; die vollständige Anleitung steht im brain-Repo: https://github.com/servas-ai/brain#setup-für-die-harness
 
 ## Befehle
@@ -31,7 +33,8 @@ Vorgebaute Binaries: https://github.com/servas-ai/brain-cli/releases/latest (`br
 | `brain clone-cell <git-url> [--name <slug>]` | Workspace-Zelle nach `workspaces/<slug>` klonen, per Sparse-Checkout ohne `AGENTS.md`, `CLAUDE.md`, `.claude/`, `.codex/` |
 | `brain check [--root <dir>]` | Pflichtfelder im Frontmatter, max. 40 Kinder, keine Harness-Dateien in Zellen, `superseded_by` bei `superseded`; Exit 1 bei Verstößen |
 | `brain doctor` | git, `core.longpaths` (Windows), OneDrive-Pfad, `qdrantcli`/`sharepointcli`, `.ignore` |
-| `brain login [--url <forge-url>] [--no-open]` | Forge-Brain: Token-Seite öffnen, Token von stdin lesen, prüfen und mit `git credential approve` ablegen (ohne `credential.helper` vorher `credential.helper store`) |
+| `brain login` | Zitadel im normalen Browser per PKCE; sichere lokale Session statt PAT/Git-Store. Voraussetzung: registrierter Client und KIRA-Adapter. |
+| `brain auth configure/status/logout`, `brain git -- ...`, `brain propose`, `brain guide` | Human-Login, Clone/Fetch/Push und erster Vorschlag: [Installation und Kundenkommandos](docs/INSTALL.md). |
 | `brain version` | Version |
 
 ### Forge-Brain (Forgejo statt GitHub)
@@ -44,7 +47,7 @@ url: https://git.example.com:8443
 org: brain
 ```
 
-Dann findet `brain sync` die Workspaces über `GET /api/v1/orgs/<org>/repos` (seitenweise, Topic `brain-cell`) mit dem Token aus `git credential fill` (abgelegt mit `brain login`); `gh` wird nicht gebraucht, die Update-Prüfung gegen GitHub ist aus. Ohne die Datei bleibt alles wie bisher.
+Dann findet `brain sync` die Workspaces über `GET /api/v1/orgs/<org>/repos` (seitenweise, Topic `brain-cell`) mit dem verifizierten OIDC-Access-Token aus der privaten Session (`brain login`); `gh` wird nicht gebraucht, die Update-Prüfung gegen GitHub ist aus. Ohne die Datei bleibt alles wie bisher.
 
 Root: `--root` oder ab dem aktuellen Verzeichnis nach oben bis zur ersten `AGENTS.md`.
 
@@ -57,6 +60,6 @@ go vet ./... && ./build.sh          # VERSION=0.1.0 Standard
 ```
 
 Ergebnis in `dist/`: `brain_<version>_<os>_<arch>.zip` (Windows) bzw. `.tar.gz`, plus `SHA256SUMS`.
-Nur Go-Standardbibliothek, `CGO_ENABLED=0`.
+Go-Standardbibliothek und MIT `golang-jwt/jwt/v5`, `CGO_ENABLED=0`; Herkunft/Lizenz: [THIRD-PARTY.md](THIRD-PARTY.md).
 
 Lizenz: MIT.

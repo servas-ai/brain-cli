@@ -18,16 +18,16 @@ import (
 // AGENTS.md („Aufgabe abschließen“). Beim zweiten Stopp (stop_hook_active) lässt er durch, damit
 // es keine Schleife gibt. Höchstens einmal pro Stunde je Sitzung.
 
-const hookReason = `PFLICHT (AGENTS.md, „Aufgabe abschließen“): Diese Sitzung hat seit der letzten Prüfung recherchiert oder gearbeitet, aber nichts ins Brain geschrieben.
-Prüfe jetzt, ob dabei Wissen entstanden ist, das die Landkarte noch nicht kennt, und schreibe es:
-1. Ergebnis zu einem Kunden/Projekt/Auftrag → in dessen Workspace.
-2. Der Weg dorthin (Quelle, Collection, Filter, Abfrage) → Fundstelle in personal/fundstellen/ (templates/fundstelle.md), sofort ins private Repo pushen.
-3. Gelöstes Tool-Problem → Fehlerbild in tools/<tool>/debugging/.
-4. Neuer wiederkehrender Ablauf → templates/ablauf.md.
-Geteiltes erst nach dem Sichtbarkeits-Review mit deinem Menschen einreichen (public/brain/einreichen).
-Gibt es nichts Neues, sag deinem Menschen in einem Satz, warum nichts ins Brain gehört.`
+const hookReason = `REQUIRED (AGENTS.md, task completion section): This session has researched or worked since the last check but has written nothing to the Brain.
+Check now whether this produced knowledge missing from the map, and record it:
+1. A result for a customer/project/order → in its workspace.
+2. How you found it (source, collection, filter, query) → a source reference in personal/fundstellen/ (templates/fundstelle.md); push it to the private repository immediately.
+3. A resolved tool issue → the symptoms in tools/<tool>/debugging/.
+4. A new recurring procedure → templates/ablauf.md.
+Submit shared content only after reviewing its visibility with your human (public/brain/einreichen).
+If there is nothing new, tell your human in one sentence why nothing belongs in the Brain.`
 
-const compactReminder = `Hinweis vom Brain: Der Verlauf wurde gerade zusammengefasst. Prüfe, ob aus der bisherigen Arbeit Wissen noch nicht im Brain steht (Ergebnisse → Workspace, Wege → personal/fundstellen/, Tool-Probleme → tools/<tool>/debugging/), und hol das jetzt nach (AGENTS.md, „Aufgabe abschließen“).`
+const compactReminder = `Brain reminder: The conversation has just been summarized. Check whether knowledge from the work so far is missing from the Brain (results → workspace, research paths → personal/fundstellen/, tool issues → tools/<tool>/debugging/), and record it now (AGENTS.md, task completion section).`
 
 type hookInput struct {
 	SessionID      string `json:"session_id"`
@@ -43,7 +43,7 @@ type hookState struct {
 
 func cmdHook(args []string) int {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "Aufruf: brain hook stop|compact")
+		fmt.Fprintln(os.Stderr, "Usage: brain hook stop|compact")
 		return 2
 	}
 	switch args[0] {
@@ -53,7 +53,7 @@ func cmdHook(args []string) int {
 	case "stop":
 		return hookStop()
 	}
-	fmt.Fprintln(os.Stderr, "brain hook: unbekannt:", args[0])
+	fmt.Fprintln(os.Stderr, "brain hook: unknown command:", args[0])
 	return 2
 }
 

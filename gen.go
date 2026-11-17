@@ -215,14 +215,14 @@ func writeKinder(root string) (int, error) {
 			return
 		}
 		var b strings.Builder
-		fmt.Fprintf(&b, "# Kinder von `%s`\n\nLokal erzeugt, nicht ändern.\n\n| Knoten | Worum es geht |\n| --- | --- |\n", relSlash(root, dir))
+		fmt.Fprintf(&b, "# Children of `%s`\n\nGenerated locally. Do not edit.\n\n| Node | Summary |\n| --- | --- |\n", relSlash(root, dir))
 		rows := make([]string, 0, len(kids))
 		for _, k := range kids {
 			fm, _ := frontmatter(filepath.Join(k, "README.md"))
 			name := filepath.Base(k)
 			summary := fm.get("summary")
 			if summary == "" {
-				summary = "(kein summary)"
+				summary = "(no summary)"
 			}
 			mark := ""
 			if fm.get("status") == "superseded" {
@@ -230,11 +230,11 @@ func writeKinder(root string) (int, error) {
 				if _, ok := fm["superseded_by"]; ok {
 					sb = fm.get("superseded_by")
 				}
-				mark = fmt.Sprintf(" **ÜBERHOLT** → `%s`.", sb)
+				mark = fmt.Sprintf(" **SUPERSEDED** → `%s`.", sb)
 			}
 			more := ""
 			if n := len(childNodes(k)); n > 0 {
-				more = fmt.Sprintf(" (%d Kinder)", n)
+				more = fmt.Sprintf(" (%d children)", n)
 			}
 			rows = append(rows, fmt.Sprintf("| [%s](%s/README.md)%s | %s%s |", name, name, more, summary, mark))
 		}
@@ -270,13 +270,15 @@ func writeWorkspaces(root string) error {
 			name, name, c.get("titel"), c.get("art"), c.get("phase"), c.get("keys"), c.get("satz")))
 	}
 	var b strings.Builder
-	b.WriteString("# Deine Workspaces\n\nLokal erzeugt aus den Zellen, die dein GitHub-Login lesen darf. Nicht ändern.\n")
-	for _, st := range []string{"aktiv", "ruhend", "archiviert"} {
-		if len(rows[st]) == 0 {
+	b.WriteString("# Your workspaces\n\nGenerated locally from the cells your GitHub login can read. Do not edit.\n")
+	for _, st := range []struct{ value, label string }{
+		{"aktiv", "Active"}, {"ruhend", "Dormant"}, {"archiviert", "Archived"},
+	} {
+		if len(rows[st.value]) == 0 {
 			continue
 		}
-		fmt.Fprintf(&b, "\n## %s\n\n| Workspace | Titel | Art | Phase | Schlüssel | Worum es geht |\n| --- | --- | --- | --- | --- | --- |\n", st)
-		b.WriteString(strings.Join(rows[st], "\n") + "\n")
+		fmt.Fprintf(&b, "\n## %s\n\n| Workspace | Title | Type | Phase | Keys | Summary |\n| --- | --- | --- | --- | --- | --- |\n", st.label)
+		b.WriteString(strings.Join(rows[st.value], "\n") + "\n")
 	}
 	return os.WriteFile(filepath.Join(root, "_workspaces.md"), []byte(b.String()), 0o644)
 }
@@ -289,6 +291,20 @@ func keyKind(k string) string {
 		return "normen-und-regelwerke"
 	}
 	return "begriffe-und-kuerzel"
+}
+
+// katalogLabel translates display labels while preserving existing catalog filenames.
+func katalogLabel(kind string) string {
+	for _, k := range []struct{ name, label string }{
+		{"projektnummern", "Project numbers"},
+		{"normen-und-regelwerke", "Standards and regulations"},
+		{"begriffe-und-kuerzel", "Terms and abbreviations"},
+	} {
+		if kind == k.name || strings.HasPrefix(kind, k.name+"-") {
+			return k.label + strings.TrimPrefix(kind, k.name)
+		}
+	}
+	return kind
 }
 
 type entry struct{ key, path, summary, status string }
@@ -352,10 +368,10 @@ func writeKatalog(root string) error {
 	}
 	sort.Strings(kinds)
 	var b strings.Builder
-	b.WriteString("# Katalog\n\nLokal erzeugt aus den `keys` aller Knoten, die du sehen darfst. Nicht ändern. " +
-		"Wähle die Datei nach der Art deines Schlüssels:\n\n")
+	b.WriteString("# Catalog\n\nGenerated locally from the `keys` of all nodes you can access. Do not edit. " +
+		"Choose the file matching the type of your key:\n\n")
 	for _, kind := range kinds {
-		fmt.Fprintf(&b, "- [%s](%s.md): %d Einträge\n", kind, kind, len(entries[kind]))
+		fmt.Fprintf(&b, "- [%s](%s.md): %d entries\n", katalogLabel(kind), kind, len(entries[kind]))
 	}
 	if err := os.WriteFile(filepath.Join(kd, "README.md"), []byte(b.String()), 0o644); err != nil {
 		return err
@@ -364,11 +380,11 @@ func writeKatalog(root string) error {
 		items := append([]entry(nil), entries[kind]...)
 		sort.SliceStable(items, func(i, j int) bool { return strings.ToLower(items[i].key) < strings.ToLower(items[j].key) })
 		var f strings.Builder
-		fmt.Fprintf(&f, "# Katalog: %s\n\n| Schlüssel | Knoten | Worum es geht |\n| --- | --- | --- |\n", kind)
+		fmt.Fprintf(&f, "# Catalog: %s\n\n| Key | Node | Summary |\n| --- | --- | --- |\n", katalogLabel(kind))
 		for _, it := range items {
 			mark := ""
 			if it.status == "superseded" {
-				mark = " **ÜBERHOLT**"
+				mark = " **SUPERSEDED**"
 			}
 			fmt.Fprintf(&f, "| %s | [%s](../%s) | %s%s |\n", it.key, it.path, it.path, it.summary, mark)
 		}
@@ -381,8 +397,8 @@ func writeKatalog(root string) error {
 
 func writePerspektive(root, src string) error {
 	var b strings.Builder
-	b.WriteString("# Deine Perspektive\n\nLokal erzeugt aus deinen Logins. Nicht ändern. " +
-		"Was hier fehlt, sieht dein Mensch nicht; versuch es nicht.\n\n")
+	b.WriteString("# Your perspective\n\nGenerated locally from your logins. Do not edit. " +
+		"Your human cannot access anything missing here; do not try to access it.\n\n")
 	if src == "" {
 		if d := filepath.Join(root, ".brain", "perspektive.md"); isFile(d) {
 			src = d
@@ -395,20 +411,20 @@ func writePerspektive(root, src string) error {
 		}
 		b.WriteString(t)
 	} else {
-		b.WriteString("(keine Angaben zu Logins)\n")
+		b.WriteString("(no login information)\n")
 	}
 	names := cellNames(root)
-	personal := "fehlt"
+	personal := "missing"
 	if isDir(filepath.Join(root, "personal")) {
-		personal = "vorhanden"
+		personal = "present"
 	}
-	fmt.Fprintf(&b, "\n## GitHub-Zellen\n\n- personal/: %s\n- Workspaces (%d): siehe `_workspaces.md`\n", personal, len(names))
+	fmt.Fprintf(&b, "\n## GitHub cells\n\n- personal/: %s\n- Workspaces (%d): see `_workspaces.md`\n", personal, len(names))
 	for _, n := range names {
 		fmt.Fprintf(&b, "  - `workspaces/%s`\n", n)
 	}
 	for _, t := range []struct{ bin, arg, title string }{
-		{"qdrantcli", "collections", "Qdrant-Collections (`qdrantcli collections`)"},
-		{"sharepointcli", "whoami", "SharePoint-Login (`sharepointcli whoami`)"},
+		{"qdrantcli", "collections", "Qdrant collections (`qdrantcli collections`)"},
+		{"sharepointcli", "whoami", "SharePoint login (`sharepointcli whoami`)"},
 	} {
 		if _, err := lookPath(t.bin); err != nil {
 			continue
@@ -419,7 +435,7 @@ func writePerspektive(root, src string) error {
 			b.WriteString("```\n" + s + "\n```\n")
 		}
 		if err != nil {
-			fmt.Fprintf(&b, "Fehler: %v\n", err)
+			fmt.Fprintf(&b, "Error: %v\n", err)
 		}
 	}
 	return os.WriteFile(filepath.Join(root, "_perspektive.md"), []byte(b.String()), 0o644)

@@ -25,7 +25,7 @@ type fakeForgejo struct {
 }
 
 func (f *fakeForgejo) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Authorization") != "token "+testToken {
+	if r.Header.Get("Authorization") != "Bearer "+testToken {
 		http.NotFound(w, r)
 		return
 	}
@@ -154,7 +154,14 @@ func TestForgejoCellsPaginatedTopicFilter(t *testing.T) {
 		}
 		f.repos = append(f.repos, r)
 	}
-	srv := httptest.NewServer(f)
+	srv := httptest.NewTLSServer(f)
+	oldHTTP := forgeHTTP
+	forgeHTTP = srv.Client()
+	forgeHTTP.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	defer func() { forgeHTTP = oldHTTP }()
+	for i := range f.repos {
+		f.repos[i].CloneURL = srv.URL + "/brain/" + f.repos[i].Name + ".git"
+	}
 	defer srv.Close()
 	cells, err := forgejoCells(&forgeConfig{Typ: "forgejo", URL: srv.URL, Org: "brain"}, testToken)
 	if err != nil {
@@ -174,111 +181,6 @@ func TestForgejoCellsPaginatedTopicFilter(t *testing.T) {
 	if _, err := forgejoCells(&forgeConfig{URL: srv.URL, Org: "brain"}, "falsch"); err == nil {
 		t.Fatal("falsches Token: kein Fehler")
 	}
-}
-
-// Ende-zu-Ende: Login legt das Token per git credential ab (Helper store wird gesetzt), danach
-// findet discoverCells über die Fake-Forge genau die Zellen mit Topic brain-cell und klont sie.
-func TestLoginThenDiscoverForgejo(t *testing.T) {
-	home, gitconfig := isolatedGit(t)
-	src := t.TempDir()
-	for _, n := range []string{"ws-a", "ws-b"} {
-		d := filepath.Join(src, n)
-		mustGit(t, "init", "-q", "-b", "main", d)
-		os.WriteFile(filepath.Join(d, ".cell.yml"), []byte("titel: "+n+"\nstatus: aktiv\n"), 0o644)
-		os.WriteFile(filepath.Join(d, "AGENTS.md"), []byte("x\n"), 0o644)
-		mustGit(t, "-C", d, "add", "-A")
-		mustGit(t, "-C", d, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init")
-	}
-	f := &fakeForgejo{org: "brain", repos: []forgeRepo{
-		{Name: "brain", CloneURL: "/nicht/klonen", Topics: nil},
-		{Name: "ws-a", CloneURL: filepath.Join(src, "ws-a"), Topics: []string{"brain-cell"}},
-		{Name: "ws-b", CloneURL: filepath.Join(src, "ws-b"), Topics: []string{"anderes"}},
-	}}
-	srv := httptest.NewServer(f)
-	defer srv.Close()
-
-	root := t.TempDir()
-	os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("brain\n"), 0o644)
-	writeForge(t, root, "typ: forgejo\nurl: "+srv.URL+"\norg: brain\n")
-
-	// ohne Token: Discovery meldet nur eine Warnung
-	if a, g := discoverCells(root); a != nil || g != nil {
-		t.Fatalf("ohne Token: %v %v", a, g)
-	}
-	var code int
-	withStdin(t, "falsch\n", func() { code = cmdLogin([]string{"--root", root, "--no-open"}) })
-	if code != 1 {
-		t.Fatalf("login mit falschem Token: %d", code)
-	}
-	withStdin(t, testToken+"\n", func() { code = cmdLogin([]string{"--root", root, "--no-open"}) })
-	if code != 0 {
-		t.Fatalf("login: %d", code)
-	}
-	cfg, _ := os.ReadFile(gitconfig)
-	if !strings.Contains(string(cfg), "helper = store") {
-		t.Fatalf("credential.helper store nicht gesetzt:\n%s", cfg)
-	}
-	creds, _ := os.ReadFile(filepath.Join(home, ".git-credentials"))
-	if !strings.Contains(string(creds), "alice:"+testToken+"@") {
-		t.Fatal("Token nicht in ~/.git-credentials")
-	}
-	if u, p, err := gitCredential(srv.URL); err != nil || u != "alice" || p != testToken {
-		t.Fatalf("credential fill: %q %v", u, err)
-	}
-
-	added, gone := discoverCells(root)
-	if strings.Join(added, ",") != "ws-a" || len(gone) != 0 {
-		t.Fatalf("added=%v gone=%v", added, gone)
-	}
-	if !isFile(filepath.Join(root, "workspaces", "ws-a", ".cell.yml")) {
-		t.Fatal("ws-a nicht geklont")
-	}
-	if isFile(filepath.Join(root, "workspaces", "ws-a", "AGENTS.md")) {
-		t.Fatal("AGENTS.md in der Zelle (Sparse-Checkout fehlt)")
-	}
-	if exists(filepath.Join(root, "workspaces", "ws-b")) || exists(filepath.Join(root, "workspaces", "brain")) {
-		t.Fatal("Repo ohne Topic brain-cell geklont")
-	}
-	// zweiter Lauf: nichts Neues, nichts weg
-	if a, g := discoverCells(root); len(a) != 0 || len(g) != 0 {
-		t.Fatalf("2. Lauf: %v %v", a, g)
-	}
-	// Zelle nicht mehr freigegeben → nur gemeldet
-	f.repos = f.repos[:1]
-	f.repos = append(f.repos, forgeRepo{Name: "ws-c", CloneURL: "/gibt/es/nicht", Topics: []string{"brain-cell"}})
-	if _, g := discoverCells(root); strings.Join(g, ",") != "ws-a" || !isDir(filepath.Join(root, "workspaces", "ws-a")) {
-		t.Fatalf("gone=%v", g)
-	}
-}
-
-func TestLoginKeepsExistingHelper(t *testing.T) {
-	home, gitconfig := isolatedGit(t)
-	store := filepath.Join(home, "eigene-creds")
-	mustGit(t, "config", "--global", "credential.helper", "store --file="+store)
-	srv := httptest.NewServer(&fakeForgejo{org: "brain"})
-	defer srv.Close()
-	var code int
-	withStdin(t, testToken+"\n", func() { code = cmdLogin([]string{"--url", srv.URL + "/", "--no-open"}) })
-	if code != 0 {
-		t.Fatalf("login: %d", code)
-	}
-	cfg, _ := os.ReadFile(gitconfig)
-	if strings.Count(string(cfg), "helper") != 1 {
-		t.Fatalf("Helper verändert:\n%s", cfg)
-	}
-	if b, _ := os.ReadFile(store); !strings.Contains(string(b), testToken) {
-		t.Fatal("Token nicht im vorhandenen Helper")
-	}
-}
-
-func TestLoginWithoutURL(t *testing.T) {
-	isolatedGit(t)
-	root := t.TempDir()
-	withStdin(t, testToken+"\n", func() {
-		if code := cmdLogin([]string{"--root", root, "--no-open"}); code != 2 {
-			t.Fatalf("ohne URL: %d", code)
-		}
-	})
 }
 
 func TestUpdateCheckOffForForgeBrain(t *testing.T) {

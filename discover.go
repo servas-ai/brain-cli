@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +22,7 @@ func discoverCells(root string) (added, gone []string) {
 			out, err = forgeCellLines(fc)
 		}
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "brain: Warnung: Workspaces nicht gefunden:", err)
+			fmt.Fprintln(os.Stderr, "brain: warning: workspace discovery failed:", err)
 			return nil, nil
 		}
 	} else {
@@ -83,21 +84,27 @@ func githubCellLines(root string) (string, bool) {
 }
 
 func orgFromURL(u string) string {
-	u = strings.TrimSuffix(u, ".git")
-	if i := strings.Index(u, "github.com"); i >= 0 {
-		rest := strings.TrimLeft(u[i+len("github.com"):], ":/")
-		if j := strings.Index(rest, "/"); j > 0 {
-			return rest[:j]
-		}
+	// Keep recognizing existing GitHub metadata, without accepting hosts
+	// which merely contain the text github.com.
+	if strings.HasPrefix(u, "git@github.com:") {
+		u = "https://github.com/" + strings.TrimPrefix(u, "git@github.com:")
+	}
+	if !githubHTTPS(u) {
+		return ""
+	}
+	parsed, _ := url.Parse(u)
+	parts := strings.Split(strings.TrimPrefix(parsed.Path, "/"), "/")
+	if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+		return parts[0]
 	}
 	return ""
 }
 
 func reportDiscovery(added, gone []string) {
 	for _, a := range added {
-		fmt.Println("brain sync: neuer Workspace eingehängt: " + a)
+		fmt.Println("brain sync: new workspace mounted: " + a)
 	}
 	for _, g := range gone {
-		fmt.Println("brain sync: Workspace nicht mehr freigegeben (lokal belassen, bitte prüfen): " + g)
+		fmt.Println("brain sync: workspace access no longer granted (kept locally; please review): " + g)
 	}
 }
